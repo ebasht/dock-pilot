@@ -22,3 +22,5 @@ frontend/.env.local
 dist/
 *.tar.gz
 *.log
+
+.cu
