@@ -88,6 +88,15 @@ curl -fsSL https://raw.githubusercontent.com/e-bashtan/dock-pilot/main/scripts/i
 
 Токен также сохраняется в `/opt/dock-pilot/credentials.txt`.
 
+Если на сервере уже стоят Docker, nginx и certbot, но `apt` ругается на конфликты пакетов:
+
+```bash
+# ... тот же curl, но с:
+  --skip-packages
+```
+
+Диагностика apt: `apt-mark showhold`, `apt --fix-broken install`, `apt-get update`.
+
 Дальше в панели создайте сайт с **вашим доменом приложения** (DNS → тот же VPS) и нажмите Deploy — certbot выдаст сертификат для сайта автоматически.
 
 ### Сборка релиза (maintainer)

@@ -30,6 +30,17 @@ detect_os() {
   fi
 }
 
+apt_install() {
+  # shellcheck disable=SC2068
+  apt-get install -y -qq "$@" || {
+    log "apt install failed for: $*"
+    log "Try: apt --fix-broken install && apt-get update"
+    log "Held packages: apt-mark showhold"
+    log "If docker/nginx/certbot are already installed, re-run with --skip-packages"
+    return 1
+  }
+}
+
 install_packages() {
   local os
   os="$(detect_os)"
@@ -37,12 +48,39 @@ install_packages() {
     ubuntu|debian)
       export DEBIAN_FRONTEND=noninteractive
       apt-get update -qq
-      apt-get install -y -qq \
-        ca-certificates curl gnupg lsb-release \
-        nginx certbot python3-certbot-nginx \
-        docker.io docker-compose-v2 2>/dev/null \
-        || apt-get install -y -qq docker.io docker-compose-plugin
-      systemctl enable --now docker nginx
+
+      apt_install ca-certificates curl gnupg lsb-release
+
+      if ! command -v nginx >/dev/null 2>&1; then
+        apt_install nginx
+      else
+        log "nginx already installed — skipping"
+      fi
+
+      if ! command -v certbot >/dev/null 2>&1; then
+        apt_install certbot python3-certbot-nginx
+      else
+        log "certbot already installed — skipping"
+      fi
+
+      if ! command -v docker >/dev/null 2>&1; then
+        if ! apt_install docker.io; then
+          die "Could not install docker.io — resolve apt conflicts or install Docker manually"
+        fi
+      else
+        log "docker already installed — skipping"
+      fi
+
+      if ! docker compose version >/dev/null 2>&1; then
+        apt_install docker-compose-plugin 2>/dev/null \
+          || apt_install docker-compose-v2 2>/dev/null \
+          || die "Install docker compose plugin: apt install docker-compose-plugin"
+      else
+        log "docker compose already available — skipping"
+      fi
+
+      systemctl enable docker nginx 2>/dev/null || true
+      systemctl start docker nginx 2>/dev/null || true
       ;;
     *)
       die "Unsupported OS: $os (need Ubuntu/Debian). Install docker, nginx, certbot manually."
