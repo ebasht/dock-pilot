@@ -1,0 +1,14 @@
+FROM golang:1.23-alpine
+
+RUN apk add --no-cache git \
+    && go install github.com/pressly/goose/v3/cmd/goose@v3.24.2
+
+ENV GOOSE_DRIVER=postgres
+
+# Migrations are baked into the image (no need to copy backend/migrations to VPS separately).
+COPY migrations /migrations
+
+WORKDIR /migrations
+
+ENTRYPOINT ["goose", "-dir", "/migrations"]
+CMD ["up"]

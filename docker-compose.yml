@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dock-pilot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dockpilot
+      POSTGRES_PASSWORD: dockpilot
+      POSTGRES_DB: dockpilot
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dockpilot -d dockpilot"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.migrate
+    container_name: dock-pilot-migrate
+    environment:
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: postgres://dockpilot:dockpilot@postgres:5432/dockpilot?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/migrations:/migrations:ro
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:

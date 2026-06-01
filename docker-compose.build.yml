@@ -1,0 +1,19 @@
+# Build production images locally: make docker-build
+# Default platform linux/amd64 (typical VPS). Override: DOCKER_PLATFORM=linux/arm64 make docker-build
+services:
+  api:
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ${API_IMAGE:-dock-pilot-api:latest}
+
+  frontend:
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-auto}
+        NEXT_PUBLIC_API_TOKEN: ${NEXT_PUBLIC_API_TOKEN:-}
+    image: ${FRONTEND_IMAGE:-dock-pilot-frontend:latest}

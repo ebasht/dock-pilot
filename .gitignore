@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+frontend/.next/
+frontend/out/
+
+# Go
+backend/bin/
+
+# Environment
+.env
+.env.local
+.env.*.local
+frontend/.env.local
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Build artifacts
+dist/
+*.tar.gz
+*.log
