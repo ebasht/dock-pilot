@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # One-command VPS install: Docker stack + nginx + Let's Encrypt for the control panel.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ebash/dock-pilot/main/scripts/install.sh | sudo bash -s -- \
+#   curl -fsSL https://raw.githubusercontent.com/e-bashtan/dock-pilot/main/scripts/install.sh | sudo bash -s -- \
 #     --domain deploy.example.com \
 #     --email you@example.com
 #
 set -euo pipefail
 
 INSTALL_DIR="${DOCK_PILOT_INSTALL_DIR:-/opt/dock-pilot}"
-GITHUB_REPO="${DOCK_PILOT_GITHUB_REPO:-ebash/dock-pilot}"
+GITHUB_REPO="${DOCK_PILOT_GITHUB_REPO:-e-bashtan/dock-pilot}"
 VERSION="${DOCK_PILOT_VERSION:-latest}"
 DOMAIN=""
 EMAIL=""
@@ -28,7 +28,7 @@ Required:
 Options:
   --token TOKEN       API token (generated if omitted)
   --install-dir DIR   Install path (default: /opt/dock-pilot)
-  --repo OWNER/REPO   GitHub repo (default: ebash/dock-pilot)
+  --repo OWNER/REPO   GitHub repo (default: e-bashtan/dock-pilot)
   --version TAG       Release tag v0.1.0 or latest
   --from-dir DIR      Use an unpacked release directory
   --skip-cert         HTTP only (testing)

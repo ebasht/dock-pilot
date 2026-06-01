@@ -69,12 +69,13 @@ postgres://dockpilot:dockpilot@localhost:5432/dockpilot?sslmode=disable
 
 Требования: **Ubuntu/Debian**, чистый VPS, домен панели (`deploy.example.com`) уже указывает на IP сервера, порты **80** и **443** открыты.
 
-После [публикации релиза на GitHub](https://github.com/ebash/dock-pilot/releases):
+После [публикации релиза на GitHub](https://github.com/e-bashtan/dock-pilot/releases):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ebash/dock-pilot/main/scripts/install.sh | sudo bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/e-bashtan/dock-pilot/main/scripts/install.sh | sudo bash -s -- \
   --domain deploy.example.com \
-  --email you@example.com
+  --email you@example.com \
+  --version v0.1.0
 ```
 
 Скрипт автоматически:
