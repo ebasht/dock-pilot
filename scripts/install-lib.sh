@@ -50,6 +50,11 @@ apt_install() {
 }
 
 install_packages() {
+  if host_prereqs_met; then
+    log "docker, compose, nginx, and certbot already present — skipping apt"
+    return 0
+  fi
+
   local os
   os="$(detect_os)"
   case "$os" in
@@ -57,32 +62,28 @@ install_packages() {
       export DEBIAN_FRONTEND=noninteractive
       apt-get update -qq
 
-      apt_install ca-certificates curl gnupg lsb-release
+      apt_install ca-certificates curl gnupg lsb-release || return 1
 
       if ! command -v nginx >/dev/null 2>&1; then
-        apt_install nginx
+        apt_install nginx || return 1
       else
         log "nginx already installed — skipping"
       fi
 
       if ! command -v certbot >/dev/null 2>&1; then
-        apt_install certbot python3-certbot-nginx
+        apt_install certbot python3-certbot-nginx || return 1
       else
         log "certbot already installed — skipping"
       fi
 
       if ! command -v docker >/dev/null 2>&1; then
-        if ! apt_install docker.io; then
-          die "Could not install docker.io — resolve apt conflicts or install Docker manually"
-        fi
+        apt_install docker.io || return 1
       else
         log "docker already installed — skipping"
       fi
 
       if ! docker compose version >/dev/null 2>&1; then
-        apt_install docker-compose-plugin 2>/dev/null \
-          || apt_install docker-compose-v2 2>/dev/null \
-          || die "Install docker compose plugin: apt install docker-compose-plugin"
+        apt_install docker-compose-plugin || apt_install docker-compose-v2 || return 1
       else
         log "docker compose already available — skipping"
       fi
