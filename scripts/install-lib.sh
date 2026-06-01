@@ -30,6 +30,14 @@ detect_os() {
   fi
 }
 
+# True when the host can run DockPilot without apt (docker compose + nginx + certbot).
+host_prereqs_met() {
+  command -v docker >/dev/null 2>&1 \
+    && docker compose version >/dev/null 2>&1 \
+    && command -v nginx >/dev/null 2>&1 \
+    && command -v certbot >/dev/null 2>&1
+}
+
 apt_install() {
   # shellcheck disable=SC2068
   apt-get install -y -qq "$@" || {

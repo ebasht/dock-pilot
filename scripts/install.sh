@@ -93,11 +93,19 @@ need_root
 
 if [[ "$SKIP_PACKAGES" -eq 0 ]]; then
   log "Installing system packages (docker, nginx, certbot)..."
-  install_packages
+  if ! install_packages; then
+    if host_prereqs_met; then
+      log "WARN: apt failed but docker, compose, nginx, and certbot are already installed — continuing"
+    else
+      die "apt install failed. Fix conflicts (apt --fix-broken install; apt-mark showhold) or install prerequisites manually, then re-run with --skip-packages"
+    fi
+  fi
 fi
 
 command -v docker >/dev/null || die "docker not found"
 docker compose version >/dev/null 2>&1 || die "docker compose plugin not found"
+command -v nginx >/dev/null || die "nginx not found (install nginx or fix apt, then re-run)"
+command -v certbot >/dev/null || die "certbot not found (install certbot or re-run with working apt)"
 
 mkdir -p "$INSTALL_DIR"
 if [[ -n "$FROM_DIR" && "$FROM_DIR" != "$INSTALL_DIR" ]]; then
