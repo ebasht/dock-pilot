@@ -62,8 +62,8 @@ services:
       - dock_pilot_work:${DEPLOY_WORK_DIR:-/var/lib/dock-pilot}
       - /:/host
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
 
   frontend:
     image: ${FRONTEND_IMAGE:-dock-pilot-frontend:latest}

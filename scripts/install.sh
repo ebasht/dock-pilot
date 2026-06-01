@@ -182,14 +182,22 @@ chmod 600 .env
 log "Starting stack (postgres → migrate → api → frontend)..."
 docker compose -f docker-compose.full.yml up -d postgres
 docker compose -f docker-compose.full.yml run --rm migrate
-docker compose -f docker-compose.full.yml up -d api frontend
+log "Starting API and frontend..."
+docker compose -f docker-compose.full.yml up -d api frontend --no-deps
 
-log "Waiting for API..."
-wait_for_api "$API_PORT" || die "API not healthy on 127.0.0.1:${API_PORT}"
+log "Waiting for API on 127.0.0.1:${API_PORT}/health ..."
+if ! wait_for_api "$API_PORT"; then
+  log "API not healthy — last logs:"
+  docker compose -f docker-compose.full.yml logs api --tail 40 2>&1 || true
+  die "API not healthy on 127.0.0.1:${API_PORT} (fix containers, then re-run install or configure nginx manually)"
+fi
 
 PANEL_AVAILABLE="/etc/nginx/sites-available/dockpilot-panel.conf"
 PANEL_TEMPLATE="${INSTALL_DIR}/install/nginx-panel.conf.template"
+[[ -f "$PANEL_TEMPLATE" ]] || die "Missing ${PANEL_TEMPLATE}"
+log "Writing panel nginx config for ${DOMAIN} ..."
 write_panel_nginx "$PANEL_TEMPLATE" "$DOMAIN" "$API_PORT" "$FRONTEND_PORT" "$PANEL_AVAILABLE"
+log "Enabling nginx site and reloading ..."
 enable_panel_nginx /etc/nginx/sites-available /etc/nginx/sites-enabled
 
 if [[ "$SKIP_CERT" -eq 0 ]]; then

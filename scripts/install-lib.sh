@@ -126,6 +126,8 @@ write_panel_nginx() {
 
 enable_panel_nginx() {
   local available="$1" enabled="$2" name="dockpilot-panel.conf"
+  # Ubuntu default site often captures port 80 before the panel vhost.
+  rm -f "${enabled}/default" "${enabled}/default.conf" 2>/dev/null || true
   ln -sf "$available/$name" "$enabled/$name"
   nginx -t
   systemctl reload nginx
