@@ -140,6 +140,15 @@ done
 log "Loading Docker images..."
 gunzip -c "$IMAGES" | docker load
 
+# Re-run must not rotate Postgres password: the data volume keeps the first password.
+if [[ -f .env ]]; then
+  log "Reusing secrets from existing .env (Postgres volume keeps its password)"
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(rand_secret 24)}"
 SECRETS_KEY="${SECRETS_ENCRYPTION_KEY:-$(rand_secret 32)}"
 API_TOKEN="${API_TOKEN:-$(rand_secret 32)}"
