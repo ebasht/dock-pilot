@@ -84,8 +84,27 @@ SCRIPT_ROOT="${FROM_DIR:-$INSTALL_DIR}"
   exit 1
 }
 
-# shellcheck source=scripts/install-lib.sh
-source "${SCRIPT_ROOT}/scripts/install-lib.sh"
+# Release tarballs ship frozen scripts; pull latest installer helpers from main when online.
+source_install_lib() {
+  local bundled="${SCRIPT_ROOT}/scripts/install-lib.sh"
+  local url="https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install-lib.sh"
+  local tmp
+  tmp="$(mktemp)"
+  if curl -fsSL "$url" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+    # shellcheck source=/dev/null
+    source "$tmp"
+    rm -f "$tmp"
+    log "Installer helpers: ${GITHUB_REPO}@main"
+  elif [[ -f "$bundled" ]]; then
+    # shellcheck source=/dev/null
+    source "$bundled"
+    log "Installer helpers: bundled in ${SCRIPT_ROOT} (offline or raw fetch failed)"
+  else
+    die "install-lib.sh not found"
+  fi
+}
+
+source_install_lib
 
 [[ -n "$DOMAIN" ]] || { usage; die "--domain is required"; }
 [[ -n "$EMAIL" ]] || { usage; die "--email is required"; }
