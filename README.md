@@ -72,11 +72,16 @@ postgres://dockpilot:dockpilot@localhost:5432/dockpilot?sslmode=disable
 После [публикации релиза на GitHub](https://github.com/e-bashtan/dock-pilot/releases):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/e-bashtan/dock-pilot/main/scripts/install.sh | sudo bash -s -- \
+curl -fsSL -H "Accept: application/vnd.github.raw+json" \
+  "https://api.github.com/repos/e-bashtan/dock-pilot/contents/scripts/install.sh?ref=main" \
+  | sudo bash -s -- \
   --domain deploy.example.com \
   --email you@example.com \
-  --version v0.1.0
+  --version v0.1.0 \
+  --skip-packages
 ```
+
+> `raw.githubusercontent.com` может отдавать устаревший `install.sh` (CDN). Используйте GitHub API (команда выше) или `cdn.jsdelivr.net/gh/e-bashtan/dock-pilot@main/scripts/install.sh`.
 
 Скрипт автоматически:
 
@@ -91,7 +96,9 @@ curl -fsSL https://raw.githubusercontent.com/e-bashtan/dock-pilot/main/scripts/i
 Повторный запуск установки (починит nginx + certbot, подберёт свободные порты):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/e-bashtan/dock-pilot/main/scripts/install.sh | sudo bash -s -- \
+curl -fsSL -H "Accept: application/vnd.github.raw+json" \
+  "https://api.github.com/repos/e-bashtan/dock-pilot/contents/scripts/install.sh?ref=main" \
+  | sudo bash -s -- \
   --domain panel.example.com \
   --email you@example.com \
   --version v0.1.0 \

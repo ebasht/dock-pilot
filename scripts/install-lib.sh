@@ -131,6 +131,8 @@ write_panel_nginx() {
 
 enable_panel_nginx() {
   local available="$1" enabled="$2" name="dockpilot-panel.conf"
+  # Legacy vps-deploy tuning file breaks nginx -t (duplicate server_names_hash_*).
+  rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
   # Ubuntu default site often captures port 80 before the panel vhost.
   rm -f "${enabled}/default" "${enabled}/default.conf" 2>/dev/null || true
   ln -sf "$available/$name" "$enabled/$name"
@@ -140,6 +142,7 @@ enable_panel_nginx() {
 
 issue_panel_cert() {
   local domain="$1" email="$2"
+  rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
   certbot --nginx -d "$domain" --non-interactive --agree-tos -m "$email" --redirect --no-eff-email
 }
 
