@@ -90,7 +90,7 @@ SCRIPT_ROOT="${FROM_DIR:-$INSTALL_DIR}"
 # Release tarballs ship frozen scripts; pull latest installer helpers from main when online.
 source_install_lib() {
   local bundled="${SCRIPT_ROOT}/scripts/install-lib.sh"
-  local url="https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install-lib.sh"
+  local url="https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install-lib.sh?$(date +%s)"
   local tmp
   tmp="$(mktemp)"
   if curl -fsSL "$url" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
@@ -109,17 +109,35 @@ source_install_lib() {
 
 source_install_lib
 
+# GitHub raw CDN can lag; never use `docker compose exec` here (hangs on some hosts).
+wait_for_postgres() {
+  local tries=30 health running
+  for ((tries=30; tries>0; tries--)); do
+    health="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' dock-pilot-postgres 2>/dev/null || echo missing)"
+    if [[ "$health" == "healthy" ]]; then
+      return 0
+    fi
+    running="$(docker inspect --format='{{.State.Running}}' dock-pilot-postgres 2>/dev/null || echo false)"
+    if [[ "$running" == "true" && "$health" != "missing" && "$health" != "unhealthy" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 refresh_install_files() {
   local base="https://raw.githubusercontent.com/${GITHUB_REPO}/main"
+  local cache="?$(date +%s)"
   local tmp
   tmp="$(mktemp)"
-  if curl -fsSL "${base}/docker-compose.full.yml" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+  if curl -fsSL "${base}/docker-compose.full.yml${cache}" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
     cp "$tmp" "${INSTALL_DIR}/docker-compose.full.yml"
     log "Updated docker-compose.full.yml from ${GITHUB_REPO}@main"
   fi
   rm -f "$tmp"
   tmp="$(mktemp)"
-  if curl -fsSL "${base}/install/nginx-panel.conf.template" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+  if curl -fsSL "${base}/install/nginx-panel.conf.template${cache}" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
     mkdir -p "${INSTALL_DIR}/install"
     cp "$tmp" "${INSTALL_DIR}/install/nginx-panel.conf.template"
   fi
