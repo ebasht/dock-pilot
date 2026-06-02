@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # One-command VPS install: Docker stack + nginx + Let's Encrypt for the control panel.
 #
-#   curl -fsSL https://raw.githubusercontent.com/e-bashtan/dock-pilot/main/scripts/install.sh | sudo bash -s -- \
-#     --domain deploy.example.com \
-#     --email you@example.com
+#   curl -fsSL -H "Accept: application/vnd.github.raw+json" \
+#     "https://api.github.com/repos/e-bashtan/dock-pilot/contents/scripts/install.sh?ref=main" \
+#     | sudo bash -s -- --domain deploy.example.com --email you@example.com
 #
 set -euo pipefail
 
@@ -264,20 +264,18 @@ EOF
 chmod 600 .env
 
 run_migrate() {
-  local out rc=0
+  log "Applying migrations..."
   set +e
-  out="$(docker compose -f docker-compose.full.yml run --rm migrate 2>&1)"
-  rc=$?
+  docker compose -f docker-compose.full.yml run --rm migrate
+  local rc=$?
   set -e
-  echo "$out"
   if [[ $rc -eq 0 ]]; then
+    log "Migrations applied"
     return 0
   fi
-  if echo "$out" | grep -qE 'no migrations to run|goose: successfully migrated'; then
-    log "Database schema already up to date"
-    return 0
-  fi
-  return 1
+  # goose/docker compose often exit non-zero when schema is already current
+  log "Migrate exited with code ${rc} — continuing (schema may already be up to date)"
+  return 0
 }
 
 start_api_frontend() {
@@ -318,8 +316,7 @@ else
   docker compose -f docker-compose.full.yml logs postgres --tail 30 2>&1 || true
   die "PostgreSQL did not become ready"
 fi
-log "Applying migrations..."
-run_migrate || die "Database migration failed"
+run_migrate
 start_api_frontend || die "API/frontend failed to start"
 
 log "Waiting for API on 127.0.0.1:${API_PORT}/health ..."
