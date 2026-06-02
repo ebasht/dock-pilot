@@ -263,18 +263,23 @@ MIGRATE_IMAGE=dock-pilot-migrate:latest
 EOF
 chmod 600 .env
 
-log "Starting stack (postgres → migrate → api → frontend)..."
-docker compose -f docker-compose.full.yml up -d postgres
-log "Waiting for PostgreSQL..."
-if wait_for_postgres; then
-  log "PostgreSQL is ready"
-else
-  docker compose -f docker-compose.full.yml ps -a 2>&1 || true
-  docker compose -f docker-compose.full.yml logs postgres --tail 30 2>&1 || true
-  die "PostgreSQL did not become ready"
-fi
-log "Applying migrations..."
-docker compose -f docker-compose.full.yml run --rm migrate
+run_migrate() {
+  local out rc=0
+  set +e
+  out="$(docker compose -f docker-compose.full.yml run --rm migrate 2>&1)"
+  rc=$?
+  set -e
+  echo "$out"
+  if [[ $rc -eq 0 ]]; then
+    return 0
+  fi
+  if echo "$out" | grep -qE 'no migrations to run|goose: successfully migrated'; then
+    log "Database schema already up to date"
+    return 0
+  fi
+  return 1
+}
+
 start_api_frontend() {
   local compose_file="docker-compose.full.yml"
   local attempt
@@ -302,6 +307,19 @@ start_api_frontend() {
   done
   die "Could not start API/frontend after 5 attempts (check: docker compose logs api)"
 }
+
+log "Starting stack (postgres → migrate → api → frontend)..."
+docker compose -f docker-compose.full.yml up -d postgres
+log "Waiting for PostgreSQL..."
+if wait_for_postgres; then
+  log "PostgreSQL is ready"
+else
+  docker compose -f docker-compose.full.yml ps -a 2>&1 || true
+  docker compose -f docker-compose.full.yml logs postgres --tail 30 2>&1 || true
+  die "PostgreSQL did not become ready"
+fi
+log "Applying migrations..."
+run_migrate || die "Database migration failed"
 start_api_frontend || die "API/frontend failed to start"
 
 log "Waiting for API on 127.0.0.1:${API_PORT}/health ..."
