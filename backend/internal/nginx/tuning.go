@@ -3,6 +3,7 @@ package nginx
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -54,12 +55,23 @@ server_names_hash_max_size %d;
 
 func (m *RealManager) ensureGlobalTuning(ctx context.Context, domains []string) error {
 	bucket, maxSize := serverNamesHashSettings(domains)
-	path := m.host.ChrootPath(globalTuningHostPath)
+	confPath := m.host.ChrootPath(globalTuningHostPath)
+	nginxConfPath := m.host.ChrootPath("/etc/nginx/nginx.conf")
+
+	if b, err := os.ReadFile(nginxConfPath); err == nil && nginxConfHasActiveHashBucket(string(b)) {
+		if err := m.host.Remove(confPath); err == nil {
+			m.logger.InfoContext(ctx, "nginx hash tuning already in nginx.conf — removed conf.d duplicate",
+				"path", globalTuningHostPath,
+			)
+		}
+		return nil
+	}
+
 	if err := m.host.MkdirAll(m.host.ChrootPath("/etc/nginx/conf.d"), 0o755); err != nil {
 		return fmt.Errorf("mkdir nginx conf.d: %w", err)
 	}
 	content := globalTuningConfig(bucket, maxSize)
-	if err := m.host.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := m.host.WriteFile(confPath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("write nginx global tuning: %w", err)
 	}
 	m.logger.InfoContext(ctx, "nginx global tuning written",

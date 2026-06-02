@@ -131,6 +131,7 @@ apply_nginx_hash_tuning() {
 
   while IFS= read -r f; do
     [[ -n "$f" && -f "$f" ]] || continue
+    [[ "$f" == "$conf_snippet" ]] && continue
     sed -i -E "s/^\s*server_names_hash_bucket_size\s+[^;]+;/server_names_hash_bucket_size ${bucket};/" "$f"
     if grep -qE '^\s*server_names_hash_max_size' "$f" 2>/dev/null; then
       sed -i -E "s/^\s*server_names_hash_max_size\s+[^;]+;/server_names_hash_max_size ${max_size};/" "$f"
@@ -140,19 +141,18 @@ apply_nginx_hash_tuning() {
     patched=1
   done < <(grep -rlE '^\s*server_names_hash_bucket_size' "$nginx_conf" /etc/nginx/conf.d 2>/dev/null || true)
 
-  # Ubuntu default: commented "# server_names_hash_bucket_size 64;" — nginx still uses default 32.
-  if (( !patched )) && grep -qE '^\s*#\s*server_names_hash_bucket_size' "$nginx_conf" 2>/dev/null; then
-    sed -i -E "s/^\s*#\s*server_names_hash_bucket_size\s+[^;]*;/server_names_hash_bucket_size ${bucket};/" "$nginx_conf"
-    if grep -qE '^\s*#\s*server_names_hash_max_size' "$nginx_conf" 2>/dev/null; then
-      sed -i -E "s/^\s*#\s*server_names_hash_max_size\s+[^;]*;/server_names_hash_max_size ${max_size};/" "$nginx_conf"
-    elif ! grep -qE '^\s*server_names_hash_max_size' "$nginx_conf" 2>/dev/null; then
+  if grep -qE '^\s*server_names_hash_bucket_size' "$nginx_conf" 2>/dev/null; then
+    sed -i -E "s/^\s*server_names_hash_bucket_size\s+[^;]+;/server_names_hash_bucket_size ${bucket};/" "$nginx_conf"
+    if grep -qE '^\s*server_names_hash_max_size' "$nginx_conf" 2>/dev/null; then
+      sed -i -E "s/^\s*server_names_hash_max_size\s+[^;]+;/server_names_hash_max_size ${max_size};/" "$nginx_conf"
+    else
       sed -i "/^\s*server_names_hash_bucket_size/a server_names_hash_max_size ${max_size};" "$nginx_conf"
     fi
-    patched=1
+    rm -f "$conf_snippet" 2>/dev/null || true
+    return 0
   fi
 
   if (( patched )); then
-    rm -f "$conf_snippet" 2>/dev/null || true
     return 0
   fi
 
@@ -195,6 +195,12 @@ test_and_reload_nginx() {
       rm -f "$err"
       systemctl reload nginx
       return 0
+    fi
+    if grep -q 'duplicate' "$err" 2>/dev/null && grep -q '00-dockpilot-global' "$err" 2>/dev/null; then
+      log "Removing duplicate conf.d hash tuning (nginx.conf already sets it) ..."
+      rm -f /etc/nginx/conf.d/00-dockpilot-global.conf
+      rm -f "$err"
+      continue
     fi
     if grep -q 'server_names_hash' "$err" 2>/dev/null; then
       log "nginx -t failed (server_names_hash bucket=${bucket}) — retrying with larger hash table ..."

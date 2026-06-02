@@ -82,8 +82,8 @@ func (m *RealManager) WriteConfig(ctx context.Context, siteKey string, cfg SiteC
 	if err := m.host.MkdirAll(m.host.ChrootPath(AcmeWebroot), 0o755); err != nil {
 		return fmt.Errorf("mkdir acme webroot: %w", err)
 	}
-	if err := m.cleanupLegacyConfigs(cfg.PrimaryDomain, availablePath); err != nil {
-		return fmt.Errorf("cleanup legacy nginx configs: %w", err)
+	if err := m.cleanupConflictingConfigs(cfg.PrimaryDomain, availablePath); err != nil {
+		return fmt.Errorf("cleanup conflicting nginx configs: %w", err)
 	}
 	if err := m.host.WriteFile(availablePath, buf.Bytes(), 0o644); err != nil {
 		return fmt.Errorf("write nginx config: %w", err)
@@ -105,9 +105,8 @@ func (m *RealManager) WriteConfig(ctx context.Context, siteKey string, cfg SiteC
 	return nil
 }
 
-// cleanupLegacyConfigs removes older dockpilot-*.conf files for the same primary domain
-// so we can migrate from UUID-based names to human-readable domain names.
-func (m *RealManager) cleanupLegacyConfigs(primaryDomain, keepAvailablePath string) error {
+// cleanupConflictingConfigs removes other vhosts (manual or legacy dockpilot) for the same domain.
+func (m *RealManager) cleanupConflictingConfigs(primaryDomain, keepAvailablePath string) error {
 	primaryDomain = strings.TrimSpace(primaryDomain)
 	if primaryDomain == "" {
 		return nil
@@ -122,13 +121,12 @@ func (m *RealManager) cleanupLegacyConfigs(primaryDomain, keepAvailablePath stri
 	}
 
 	keepBase := filepath.Base(keepAvailablePath)
-	marker := "server_name " + primaryDomain
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
 		name := e.Name()
-		if name == keepBase || !strings.HasPrefix(name, "dockpilot-") || !strings.HasSuffix(name, ".conf") {
+		if name == keepBase || !strings.HasSuffix(name, ".conf") {
 			continue
 		}
 		availablePath := filepath.Join(m.available, name)
@@ -136,15 +134,17 @@ func (m *RealManager) cleanupLegacyConfigs(primaryDomain, keepAvailablePath stri
 		if err != nil {
 			continue
 		}
-		content := string(b)
-		if !strings.Contains(content, marker) {
+		if !configDeclaresDomain(string(b), primaryDomain) {
 			continue
 		}
 
 		enabledPath := filepath.Join(m.enabled, name)
 		_ = m.host.Remove(enabledPath)
 		_ = m.host.Remove(availablePath)
-		m.logger.Info("removed legacy nginx config", "domain", primaryDomain, "file", name)
+		m.logger.Info("removed conflicting nginx config",
+			"domain", primaryDomain,
+			"file", name,
+		)
 	}
 	return nil
 }
