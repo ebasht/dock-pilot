@@ -154,17 +154,29 @@ wait_for_api() {
   return 1
 }
 
+postgres_container_health() {
+  docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' dock-pilot-postgres 2>/dev/null \
+    || echo "missing"
+}
+
 wait_for_postgres() {
-  local compose_file="$1" tries=45
+  local tries=45
+  local health
+  health="$(postgres_container_health)"
+  if [[ "$health" == "healthy" ]]; then
+    return 0
+  fi
+
   while ((tries-- > 0)); do
-    if docker compose -f "$compose_file" ps postgres 2>/dev/null | grep -qE '(healthy)|\(Healthy\)'; then
+    health="$(postgres_container_health)"
+    if [[ "$health" == "healthy" ]]; then
       return 0
     fi
-    if docker compose -f "$compose_file" exec -T postgres pg_isready -U dockpilot -d dockpilot >/dev/null 2>&1; then
+    if [[ "$health" == "none" ]] && docker inspect --format='{{.State.Running}}' dock-pilot-postgres 2>/dev/null | grep -q true; then
       return 0
     fi
-    if (( tries % 10 == 0 )); then
-      log "Still waiting for PostgreSQL (${tries} checks left)..."
+    if (( tries % 10 == 9 )); then
+      log "Still waiting for PostgreSQL (${tries} checks left, health=${health})..."
     fi
     sleep 2
   done

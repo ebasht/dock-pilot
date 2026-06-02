@@ -248,7 +248,7 @@ chmod 600 .env
 log "Starting stack (postgres → migrate → api → frontend)..."
 docker compose -f docker-compose.full.yml up -d postgres
 log "Waiting for PostgreSQL..."
-if wait_for_postgres docker-compose.full.yml; then
+if wait_for_postgres; then
   log "PostgreSQL is ready"
 else
   docker compose -f docker-compose.full.yml ps -a 2>&1 || true
