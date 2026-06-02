@@ -120,22 +120,15 @@ download_release() {
   curl -fsSL "$url" -o "$dest"
 }
 
-write_nginx_global_tuning() {
-  local domain="$1"
-  local bucket=128
-  local max_size=2048
-  local len=${#domain}
+apply_nginx_hash_tuning() {
+  local bucket="${1:-128}"
+  local max_size="${2:-2048}"
+  local nginx_conf="/etc/nginx/nginx.conf"
   local conf_snippet="/etc/nginx/conf.d/00-dockpilot-global.conf"
   local patched=0 f
 
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
 
-  while (( bucket < len )); do
-    bucket=$((bucket * 2))
-  done
-
-  # Patch every file that already sets hash tuning (nginx.conf or conf.d).
-  # Skipping conf.d when nginx.conf has bucket 32 was the original failure mode.
   while IFS= read -r f; do
     [[ -n "$f" && -f "$f" ]] || continue
     sed -i -E "s/^\s*server_names_hash_bucket_size\s+[^;]+;/server_names_hash_bucket_size ${bucket};/" "$f"
@@ -145,8 +138,18 @@ write_nginx_global_tuning() {
       sed -i "/^\s*server_names_hash_bucket_size/a server_names_hash_max_size ${max_size};" "$f"
     fi
     patched=1
-    log "Updated server_names_hash_* in ${f} (bucket=${bucket})"
-  done < <(grep -rlE '^\s*server_names_hash_bucket_size' /etc/nginx/nginx.conf /etc/nginx/conf.d 2>/dev/null || true)
+  done < <(grep -rlE '^\s*server_names_hash_bucket_size' "$nginx_conf" /etc/nginx/conf.d 2>/dev/null || true)
+
+  # Ubuntu default: commented "# server_names_hash_bucket_size 64;" — nginx still uses default 32.
+  if (( !patched )) && grep -qE '^\s*#\s*server_names_hash_bucket_size' "$nginx_conf" 2>/dev/null; then
+    sed -i -E "s/^\s*#\s*server_names_hash_bucket_size\s+[^;]*;/server_names_hash_bucket_size ${bucket};/" "$nginx_conf"
+    if grep -qE '^\s*#\s*server_names_hash_max_size' "$nginx_conf" 2>/dev/null; then
+      sed -i -E "s/^\s*#\s*server_names_hash_max_size\s+[^;]*;/server_names_hash_max_size ${max_size};/" "$nginx_conf"
+    elif ! grep -qE '^\s*server_names_hash_max_size' "$nginx_conf" 2>/dev/null; then
+      sed -i "/^\s*server_names_hash_bucket_size/a server_names_hash_max_size ${max_size};" "$nginx_conf"
+    fi
+    patched=1
+  fi
 
   if (( patched )); then
     rm -f "$conf_snippet" 2>/dev/null || true
@@ -154,11 +157,57 @@ write_nginx_global_tuning() {
   fi
 
   cat >"$conf_snippet" <<EOF
-# Managed by dock-pilot — long server_name values (e.g. ${domain})
+# Managed by dock-pilot
 server_names_hash_bucket_size ${bucket};
 server_names_hash_max_size ${max_size};
 EOF
-  log "Wrote ${conf_snippet} (bucket=${bucket})"
+}
+
+write_nginx_global_tuning() {
+  local domain="$1"
+  local bucket=128
+  local max_size=2048
+  local len=${#domain}
+
+  while (( bucket < len )); do
+    bucket=$((bucket * 2))
+  done
+
+  apply_nginx_hash_tuning "$bucket" "$max_size"
+  log "nginx hash tuning (bucket=${bucket}, max_size=${max_size}, domain=${domain})"
+}
+
+test_and_reload_nginx() {
+  local domain="$1"
+  local bucket=128
+  local max_size=2048
+  local len=${#domain}
+  local attempt err
+
+  while (( bucket < len )); do
+    bucket=$((bucket * 2))
+  done
+
+  for attempt in 1 2 3 4 5; do
+    apply_nginx_hash_tuning "$bucket" "$max_size"
+    err="$(mktemp)"
+    if nginx -t 2>"$err"; then
+      rm -f "$err"
+      systemctl reload nginx
+      return 0
+    fi
+    if grep -q 'server_names_hash' "$err" 2>/dev/null; then
+      log "nginx -t failed (server_names_hash bucket=${bucket}) — retrying with larger hash table ..."
+      bucket=$((bucket * 2))
+      max_size=$((max_size * 2))
+      rm -f "$err"
+      continue
+    fi
+    cat "$err" >&2
+    rm -f "$err"
+    return 1
+  done
+  die "nginx -t failed after tuning server_names_hash (last bucket=${bucket})"
 }
 
 write_panel_nginx() {
@@ -171,14 +220,11 @@ write_panel_nginx() {
 }
 
 enable_panel_nginx() {
-  local available="$1" enabled="$2" name="dockpilot-panel.conf"
-  # Legacy vps-deploy tuning file breaks nginx -t (duplicate server_names_hash_*).
+  local available="$1" enabled="$2" domain="$3" name="dockpilot-panel.conf"
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
-  # Ubuntu default site often captures port 80 before the panel vhost.
   rm -f "${enabled}/default" "${enabled}/default.conf" 2>/dev/null || true
   ln -sf "$available/$name" "$enabled/$name"
-  nginx -t
-  systemctl reload nginx
+  test_and_reload_nginx "$domain"
 }
 
 issue_panel_cert() {
@@ -265,7 +311,7 @@ configure_panel_nginx() {
   write_nginx_global_tuning "$domain"
   write_panel_nginx "$template" "$domain" "$api_port" "$frontend_port" "$available"
   log "Enabling nginx site and reloading ..."
-  enable_panel_nginx /etc/nginx/sites-available /etc/nginx/sites-enabled
+  enable_panel_nginx /etc/nginx/sites-available /etc/nginx/sites-enabled "$domain"
 
   if ! curl -fsS -H "Host: ${domain}" "http://127.0.0.1/" >/dev/null 2>&1; then
     log "WARN: HTTP probe for Host: ${domain} failed — check DNS and nginx"

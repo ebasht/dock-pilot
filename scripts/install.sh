@@ -90,10 +90,16 @@ SCRIPT_ROOT="${FROM_DIR:-$INSTALL_DIR}"
 # Release tarballs ship frozen scripts; pull latest installer helpers from main when online.
 source_install_lib() {
   local bundled="${SCRIPT_ROOT}/scripts/install-lib.sh"
-  local url="https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install-lib.sh?$(date +%s)"
+  local api_url="https://api.github.com/repos/${GITHUB_REPO}/contents/scripts/install-lib.sh?ref=main"
+  local raw_url="https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install-lib.sh?$(date +%s)"
   local tmp
   tmp="$(mktemp)"
-  if curl -fsSL "$url" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+  if curl -fsSL -H "Accept: application/vnd.github.raw+json" "$api_url" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+    # shellcheck source=/dev/null
+    source "$tmp"
+    rm -f "$tmp"
+    log "Installer helpers: ${GITHUB_REPO}@main (GitHub API)"
+  elif curl -fsSL "$raw_url" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
     # shellcheck source=/dev/null
     source "$tmp"
     rm -f "$tmp"
@@ -101,7 +107,7 @@ source_install_lib() {
   elif [[ -f "$bundled" ]]; then
     # shellcheck source=/dev/null
     source "$bundled"
-    log "Installer helpers: bundled in ${SCRIPT_ROOT} (offline or raw fetch failed)"
+    log "Installer helpers: bundled in ${SCRIPT_ROOT} (offline or fetch failed)"
   else
     die "install-lib.sh not found"
   fi
