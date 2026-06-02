@@ -122,30 +122,35 @@ download_release() {
 
 write_nginx_global_tuning() {
   local domain="$1"
-  local bucket=64
+  local bucket=128
   local len=${#domain}
+  local nginx_conf="/etc/nginx/nginx.conf"
+  local conf_snippet="/etc/nginx/conf.d/00-dockpilot-global.conf"
 
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
 
   while (( bucket < len )); do
     bucket=$((bucket * 2))
   done
-  if (( bucket < 64 )); then
-    bucket=64
-  fi
 
-  # conf.d snippet is included in http{} — do not duplicate if already in nginx.conf.
-  if grep -qE '^\s*server_names_hash_bucket_size' /etc/nginx/nginx.conf 2>/dev/null; then
-    log "nginx.conf already sets server_names_hash_bucket_size (increase there if nginx -t fails)"
+  if grep -qE '^\s*server_names_hash_bucket_size' "$nginx_conf" 2>/dev/null; then
+    sed -i -E "s/^\s*server_names_hash_bucket_size\s+[^;]+;/server_names_hash_bucket_size ${bucket};/" "$nginx_conf"
+    if grep -qE '^\s*server_names_hash_max_size' "$nginx_conf" 2>/dev/null; then
+      sed -i -E "s/^\s*server_names_hash_max_size\s+[^;]+;/server_names_hash_max_size 1024;/" "$nginx_conf"
+    else
+      sed -i "/^\s*server_names_hash_bucket_size/a server_names_hash_max_size 1024;" "$nginx_conf"
+    fi
+    rm -f "$conf_snippet" 2>/dev/null || true
+    log "Updated server_names_hash_* in ${nginx_conf} (bucket=${bucket})"
     return 0
   fi
 
-  cat > /etc/nginx/conf.d/00-dockpilot-global.conf <<EOF
+  cat >"$conf_snippet" <<EOF
 # Managed by dock-pilot — long server_name values (e.g. ${domain})
 server_names_hash_bucket_size ${bucket};
-server_names_hash_max_size 512;
+server_names_hash_max_size 1024;
 EOF
-  log "Wrote /etc/nginx/conf.d/00-dockpilot-global.conf (bucket=${bucket})"
+  log "Wrote ${conf_snippet} (bucket=${bucket})"
 }
 
 write_panel_nginx() {
