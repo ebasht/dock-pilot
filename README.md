@@ -88,14 +88,19 @@ curl -fsSL https://raw.githubusercontent.com/e-bashtan/dock-pilot/main/scripts/i
 
 Токен также сохраняется в `/opt/dock-pilot/credentials.txt`.
 
-Если на сервере уже стоят Docker, nginx и certbot, но `apt` ругается на конфликты пакетов:
+Повторный запуск установки (починит nginx + certbot, подберёт свободные порты):
 
 ```bash
-# ... тот же curl, но с:
+curl -fsSL https://raw.githubusercontent.com/e-bashtan/dock-pilot/main/scripts/install.sh | sudo bash -s -- \
+  --domain panel.example.com \
+  --email you@example.com \
+  --version v0.1.0 \
   --skip-packages
 ```
 
-Диагностика apt: `apt-mark showhold`, `apt --fix-broken install`, `apt-get update`.
+Если Postgres ругается на пароль после прошлых попыток: добавьте `--reset-db` (удалит данные панели в Docker volume).
+
+Если на сервере уже стоят Docker, nginx и certbot, но `apt` ругается на конфликты пакетов — используйте `--skip-packages`.
 
 Дальше в панели создайте сайт с **вашим доменом приложения** (DNS → тот же VPS) и нажмите Deploy — certbot выдаст сертификат для сайта автоматически.
 

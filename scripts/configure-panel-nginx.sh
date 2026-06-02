@@ -1,52 +1,58 @@
 #!/usr/bin/env bash
-# Configure host nginx for the DockPilot panel (run on VPS as root after stack is up).
+# Configure host nginx + TLS for the panel (used by install.sh and for repair re-runs).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+
+GITHUB_REPO="${DOCK_PILOT_GITHUB_REPO:-e-bashtan/dock-pilot}"
+SKIP_CERT=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-cert) SKIP_CERT=1; shift ;;
+    -h|--help)
+      echo "Usage: configure-panel-nginx.sh [--skip-cert]"
+      echo "Reads PANEL_DOMAIN, API_PORT, FRONTEND_PORT, CERTBOT_EMAIL from .env"
+      exit 0
+      ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
 
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   echo "Run as root: sudo $0" >&2
   exit 1
 fi
 
-if [[ ! -f .env ]]; then
-  echo "Missing .env in ${ROOT}" >&2
-  exit 1
-fi
-
+[[ -f .env ]] || { echo "Missing .env in ${ROOT}" >&2; exit 1; }
+set -a
 # shellcheck disable=SC1091
 source .env
+set +a
 
 DOMAIN="${PANEL_DOMAIN:-}"
+EMAIL="${CERTBOT_EMAIL:-}"
 API_PORT="${API_PORT:-8080}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
-EMAIL="${CERTBOT_EMAIL:-}"
 
 [[ -n "$DOMAIN" ]] || { echo "Set PANEL_DOMAIN in .env" >&2; exit 1; }
+[[ -n "$EMAIL" ]] || { echo "Set CERTBOT_EMAIL in .env" >&2; exit 1; }
 
-# shellcheck source=scripts/install-lib.sh
-source "${ROOT}/scripts/install-lib.sh"
-
-PANEL_AVAILABLE="/etc/nginx/sites-available/dockpilot-panel.conf"
-PANEL_TEMPLATE="${ROOT}/install/nginx-panel.conf.template"
-[[ -f "$PANEL_TEMPLATE" ]] || { echo "Missing ${PANEL_TEMPLATE}" >&2; exit 1; }
-
-write_panel_nginx "$PANEL_TEMPLATE" "$DOMAIN" "$API_PORT" "$FRONTEND_PORT" "$PANEL_AVAILABLE"
-enable_panel_nginx /etc/nginx/sites-available /etc/nginx/sites-enabled
-
-if [[ -n "$EMAIL" ]] && command -v certbot >/dev/null 2>&1; then
-  log "Issuing Let's Encrypt certificate for ${DOMAIN}..."
-  if issue_panel_cert "$DOMAIN" "$EMAIL"; then
-    sed -i "s|^CORS_ALLOWED_ORIGINS=.*|CORS_ALLOWED_ORIGINS=https://${DOMAIN}|" .env
-    docker compose -f docker-compose.full.yml up -d api 2>/dev/null \
-      || docker compose -f docker-compose.dock-pilot.yml up -d api 2>/dev/null \
-      || true
-    log "Panel: https://${DOMAIN}"
-  else
-    log "certbot failed — panel available at http://${DOMAIN}"
-  fi
+tmp="$(mktemp)"
+if curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install-lib.sh" -o "$tmp" 2>/dev/null; then
+  # shellcheck source=/dev/null
+  source "$tmp"
 else
-  log "Panel nginx configured (HTTP). Set CERTBOT_EMAIL in .env and re-run for HTTPS."
-  log "Panel: http://${DOMAIN}"
+  # shellcheck source=scripts/install-lib.sh
+  source "${ROOT}/scripts/install-lib.sh"
 fi
+rm -f "$tmp"
+
+configure_panel_nginx "$ROOT" "$DOMAIN" "$EMAIL" "$API_PORT" "$FRONTEND_PORT" "$SKIP_CERT"
+PANEL_URL="https://${DOMAIN}"
+[[ "$SKIP_CERT" -eq 1 ]] && PANEL_URL="http://${DOMAIN}"
+sed -i "s|^CORS_ALLOWED_ORIGINS=.*|CORS_ALLOWED_ORIGINS=${PANEL_URL}|" .env
+docker compose -f docker-compose.full.yml up -d api 2>/dev/null \
+  || docker compose -f docker-compose.dock-pilot.yml up -d api
+log "Panel: ${PANEL_URL}"

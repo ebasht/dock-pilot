@@ -20,6 +20,11 @@ rand_secret() {
   fi
 }
 
+# Postgres password is embedded in DATABASE_URL — must be URL-safe (no @ : / # etc).
+rand_postgres_password() {
+  tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-24}"
+}
+
 detect_os() {
   if [[ -f /etc/os-release ]]; then
     # shellcheck disable=SC1091
@@ -135,7 +140,7 @@ enable_panel_nginx() {
 
 issue_panel_cert() {
   local domain="$1" email="$2"
-  certbot --nginx -d "$domain" --non-interactive --agree-tos -m "$email" --redirect
+  certbot --nginx -d "$domain" --non-interactive --agree-tos -m "$email" --redirect --no-eff-email
 }
 
 wait_for_api() {
@@ -147,4 +152,65 @@ wait_for_api() {
     sleep 2
   done
   return 1
+}
+
+# True if something listens on this TCP port (any interface).
+port_in_use() {
+  local port="$1"
+  ss -tln 2>/dev/null | awk '{print $4}' | grep -qE ":${port}$"
+}
+
+# Return the first free port starting at preferred (checks up to 100 candidates).
+pick_free_port() {
+  local preferred="$1"
+  local p="$preferred"
+  local limit=$((preferred + 100))
+  while ((p < limit)); do
+    if ! port_in_use "$p"; then
+      echo "$p"
+      return 0
+    fi
+    ((p++))
+  done
+  die "No free host port near ${preferred} (needed for DockPilot)"
+}
+
+postgres_volume_exists() {
+  docker volume inspect dock-pilot_dock_pilot_pg >/dev/null 2>&1 \
+    || docker volume inspect dock_pilot_pg >/dev/null 2>&1
+}
+
+# Write HTTP vhost, reload nginx, issue Let's Encrypt, update API CORS. Fails on cert error unless skip_cert.
+configure_panel_nginx() {
+  local install_dir="$1" domain="$2" email="$3" api_port="$4" frontend_port="$5" skip_cert="$6"
+  local template="${install_dir}/install/nginx-panel.conf.template"
+  local available="/etc/nginx/sites-available/dockpilot-panel.conf"
+
+  [[ -f "$template" ]] || die "Missing ${template}"
+
+  log "Writing panel nginx config for ${domain} (api=${api_port}, ui=${frontend_port}) ..."
+  write_panel_nginx "$template" "$domain" "$api_port" "$frontend_port" "$available"
+  log "Enabling nginx site and reloading ..."
+  enable_panel_nginx /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+  if ! curl -fsS -H "Host: ${domain}" "http://127.0.0.1/" >/dev/null 2>&1; then
+    log "WARN: HTTP probe for Host: ${domain} failed — check DNS and nginx"
+  fi
+
+  if [[ "$skip_cert" -eq 1 ]]; then
+    log "Skipping TLS (--skip-cert)"
+    return 0
+  fi
+
+  log "Issuing Let's Encrypt certificate for ${domain} ..."
+  if ! issue_panel_cert "$domain" "$email"; then
+    die "certbot failed for ${domain}. Check DNS → this VPS, ports 80/443 open, and: certbot --nginx -d ${domain}"
+  fi
+
+  log "TLS certificate installed for ${domain}"
+}
+
+verify_panel_https() {
+  local domain="$1"
+  curl -fsS "https://${domain}/" >/dev/null 2>&1
 }

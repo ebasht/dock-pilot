@@ -16,6 +16,7 @@ API_TOKEN=""
 FROM_DIR=""
 SKIP_CERT=0
 SKIP_PACKAGES=0
+RESET_DB=0
 
 usage() {
   cat <<EOF
@@ -33,6 +34,7 @@ Options:
   --from-dir DIR      Use an unpacked release directory
   --skip-cert         HTTP only (testing)
   --skip-packages     Skip apt install of docker/nginx/certbot
+  --reset-db          Wipe bundled Postgres volume and regenerate DB password
 EOF
 }
 
@@ -48,6 +50,7 @@ parse_args() {
       --from-dir) FROM_DIR="$2"; shift 2 ;;
       --skip-cert) SKIP_CERT=1; shift ;;
       --skip-packages) SKIP_PACKAGES=1; shift ;;
+      --reset-db) RESET_DB=1; shift ;;
       -h|--help) usage; exit 0 ;;
       *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
     esac
@@ -106,6 +109,23 @@ source_install_lib() {
 
 source_install_lib
 
+refresh_install_files() {
+  local base="https://raw.githubusercontent.com/${GITHUB_REPO}/main"
+  local tmp
+  tmp="$(mktemp)"
+  if curl -fsSL "${base}/docker-compose.full.yml" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+    cp "$tmp" "${INSTALL_DIR}/docker-compose.full.yml"
+    log "Updated docker-compose.full.yml from ${GITHUB_REPO}@main"
+  fi
+  rm -f "$tmp"
+  tmp="$(mktemp)"
+  if curl -fsSL "${base}/install/nginx-panel.conf.template" -o "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+    mkdir -p "${INSTALL_DIR}/install"
+    cp "$tmp" "${INSTALL_DIR}/install/nginx-panel.conf.template"
+  fi
+  rm -f "$tmp"
+}
+
 [[ -n "$DOMAIN" ]] || { usage; die "--domain is required"; }
 [[ -n "$EMAIL" ]] || { usage; die "--email is required"; }
 need_root
@@ -131,14 +151,23 @@ if [[ -n "$FROM_DIR" && "$FROM_DIR" != "$INSTALL_DIR" ]]; then
   cp -a "${FROM_DIR}/." "$INSTALL_DIR/"
 fi
 cd "$INSTALL_DIR"
+refresh_install_files
 
 IMAGES=""
 for f in dock-pilot-images.tar.gz dist/dock-pilot-images.tar.gz; do
   [[ -f "$f" ]] && IMAGES="$f" && break
 done
 [[ -n "$IMAGES" ]] || die "dock-pilot-images.tar.gz not found"
-log "Loading Docker images..."
-gunzip -c "$IMAGES" | docker load
+
+if docker image inspect dock-pilot-api:latest >/dev/null 2>&1 \
+  && docker image inspect dock-pilot-frontend:latest >/dev/null 2>&1 \
+  && docker image inspect dock-pilot-migrate:latest >/dev/null 2>&1 \
+  && docker image inspect dock-pilot-postgres:latest >/dev/null 2>&1; then
+  log "Docker images already loaded — skipping docker load"
+else
+  log "Loading Docker images..."
+  gunzip -c "$IMAGES" | docker load
+fi
 
 # Re-run must not rotate Postgres password: the data volume keeps the first password.
 if [[ -f .env ]]; then
@@ -149,11 +178,39 @@ if [[ -f .env ]]; then
   set +a
 fi
 
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(rand_secret 24)}"
+if [[ "$RESET_DB" -eq 1 ]]; then
+  log "Resetting Postgres volume (--reset-db) ..."
+  docker compose -f docker-compose.full.yml down 2>/dev/null || true
+  for vol in dock-pilot_dock_pilot_pg dock_pilot_pg; do
+    docker volume rm "$vol" 2>/dev/null || true
+  done
+  unset POSTGRES_PASSWORD DATABASE_URL
+fi
+
+if postgres_volume_exists && [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
+  die "Postgres volume exists but POSTGRES_PASSWORD missing in .env — re-run with --reset-db or restore .env"
+fi
+
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(rand_postgres_password 24)}"
 SECRETS_KEY="${SECRETS_ENCRYPTION_KEY:-$(rand_secret 32)}"
 API_TOKEN="${API_TOKEN:-$(rand_secret 32)}"
-API_PORT="${API_PORT:-8080}"
-FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+
+# Pick free localhost ports (8080/3000 are often taken on busy VPS hosts).
+if port_in_use "${API_PORT:-8080}"; then
+  NEW_API="$(pick_free_port "${API_PORT:-8080}")"
+  log "Host port ${API_PORT:-8080} busy — using ${NEW_API} for API"
+  API_PORT="$NEW_API"
+else
+  API_PORT="${API_PORT:-8080}"
+fi
+if port_in_use "${FRONTEND_PORT:-3000}"; then
+  NEW_FE="$(pick_free_port "${FRONTEND_PORT:-3000}")"
+  log "Host port ${FRONTEND_PORT:-3000} busy — using ${NEW_FE} for frontend"
+  FRONTEND_PORT="$NEW_FE"
+else
+  FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+fi
+
 PANEL_URL="https://${DOMAIN}"
 [[ "$SKIP_CERT" -eq 1 ]] && PANEL_URL="http://${DOMAIN}"
 
@@ -198,26 +255,20 @@ log "Waiting for API on 127.0.0.1:${API_PORT}/health ..."
 if ! wait_for_api "$API_PORT"; then
   log "API not healthy — last logs:"
   docker compose -f docker-compose.full.yml logs api --tail 40 2>&1 || true
-  die "API not healthy on 127.0.0.1:${API_PORT} (fix containers, then re-run install or configure nginx manually)"
+  die "API not healthy on 127.0.0.1:${API_PORT}"
 fi
 
-PANEL_AVAILABLE="/etc/nginx/sites-available/dockpilot-panel.conf"
-PANEL_TEMPLATE="${INSTALL_DIR}/install/nginx-panel.conf.template"
-[[ -f "$PANEL_TEMPLATE" ]] || die "Missing ${PANEL_TEMPLATE}"
-log "Writing panel nginx config for ${DOMAIN} ..."
-write_panel_nginx "$PANEL_TEMPLATE" "$DOMAIN" "$API_PORT" "$FRONTEND_PORT" "$PANEL_AVAILABLE"
-log "Enabling nginx site and reloading ..."
-enable_panel_nginx /etc/nginx/sites-available /etc/nginx/sites-enabled
+configure_panel_nginx "$INSTALL_DIR" "$DOMAIN" "$EMAIL" "$API_PORT" "$FRONTEND_PORT" "$SKIP_CERT"
+PANEL_URL="https://${DOMAIN}"
+[[ "$SKIP_CERT" -eq 1 ]] && PANEL_URL="http://${DOMAIN}"
+sed -i "s|^CORS_ALLOWED_ORIGINS=.*|CORS_ALLOWED_ORIGINS=${PANEL_URL}|" .env
+docker compose -f docker-compose.full.yml up -d api
 
 if [[ "$SKIP_CERT" -eq 0 ]]; then
-  log "Issuing Let's Encrypt certificate for ${DOMAIN}..."
-  if issue_panel_cert "$DOMAIN" "$EMAIL"; then
-    PANEL_URL="https://${DOMAIN}"
-    sed -i "s|^CORS_ALLOWED_ORIGINS=.*|CORS_ALLOWED_ORIGINS=${PANEL_URL}|" .env
-    docker compose -f docker-compose.full.yml up -d api
+  if verify_panel_https "$DOMAIN"; then
+    log "HTTPS verified: https://${DOMAIN}/health"
   else
-    log "WARN: certbot failed — use http://${DOMAIN} (check DNS → VPS and ports 80/443)"
-    PANEL_URL="http://${DOMAIN}"
+    die "HTTPS check failed for ${DOMAIN} after certbot (try: nginx -T | grep -A20 ${DOMAIN})"
   fi
 fi
 
