@@ -248,7 +248,13 @@ chmod 600 .env
 log "Starting stack (postgres → migrate → api → frontend)..."
 docker compose -f docker-compose.full.yml up -d postgres
 log "Waiting for PostgreSQL..."
-wait_for_postgres docker-compose.full.yml || die "PostgreSQL did not become ready"
+if wait_for_postgres docker-compose.full.yml; then
+  log "PostgreSQL is ready"
+else
+  docker compose -f docker-compose.full.yml ps -a 2>&1 || true
+  docker compose -f docker-compose.full.yml logs postgres --tail 30 2>&1 || true
+  die "PostgreSQL did not become ready"
+fi
 log "Applying migrations..."
 docker compose -f docker-compose.full.yml run --rm migrate
 start_api_frontend() {
@@ -278,6 +284,7 @@ start_api_frontend() {
   done
   die "Could not start API/frontend after 5 attempts (check: docker compose logs api)"
 }
+start_api_frontend || die "API/frontend failed to start"
 
 log "Waiting for API on 127.0.0.1:${API_PORT}/health ..."
 if ! wait_for_api "$API_PORT"; then

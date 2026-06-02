@@ -157,8 +157,14 @@ wait_for_api() {
 wait_for_postgres() {
   local compose_file="$1" tries=45
   while ((tries-- > 0)); do
-    if docker compose -f "$compose_file" exec -T postgres pg_isready -U dockpilot >/dev/null 2>&1; then
+    if docker compose -f "$compose_file" ps postgres 2>/dev/null | grep -qE '(healthy)|\(Healthy\)'; then
       return 0
+    fi
+    if docker compose -f "$compose_file" exec -T postgres pg_isready -U dockpilot -d dockpilot >/dev/null 2>&1; then
+      return 0
+    fi
+    if (( tries % 10 == 0 )); then
+      log "Still waiting for PostgreSQL (${tries} checks left)..."
     fi
     sleep 2
   done
