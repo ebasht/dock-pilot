@@ -125,40 +125,16 @@ apply_nginx_hash_tuning() {
   local max_size="${2:-2048}"
   local nginx_conf="/etc/nginx/nginx.conf"
   local conf_snippet="/etc/nginx/conf.d/00-dockpilot-global.conf"
-  local patched=0 f
 
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
 
-  # Installer sets hash in nginx.conf; API may leave conf.d — drop duplicate before nginx -t.
+  # Single source of truth: conf.d (API also writes this file on deploy).
+  # Comment out active hash lines in nginx.conf — duplicates break nginx -t.
   if grep -qE '^\s*server_names_hash_bucket_size' "$nginx_conf" 2>/dev/null; then
-    rm -f "$conf_snippet" 2>/dev/null || true
+    sed -i -E 's/^\s*server_names_hash_bucket_size\s+[^;]+;/# server_names_hash_bucket_size (use conf.d);/' "$nginx_conf"
   fi
-
-  while IFS= read -r f; do
-    [[ -n "$f" && -f "$f" ]] || continue
-    [[ "$f" == "$conf_snippet" ]] && continue
-    sed -i -E "s/^\s*server_names_hash_bucket_size\s+[^;]+;/server_names_hash_bucket_size ${bucket};/" "$f"
-    if grep -qE '^\s*server_names_hash_max_size' "$f" 2>/dev/null; then
-      sed -i -E "s/^\s*server_names_hash_max_size\s+[^;]+;/server_names_hash_max_size ${max_size};/" "$f"
-    else
-      sed -i "/^\s*server_names_hash_bucket_size/a server_names_hash_max_size ${max_size};" "$f"
-    fi
-    patched=1
-  done < <(grep -rlE '^\s*server_names_hash_bucket_size' "$nginx_conf" /etc/nginx/conf.d 2>/dev/null || true)
-
-  if grep -qE '^\s*server_names_hash_bucket_size' "$nginx_conf" 2>/dev/null; then
-    sed -i -E "s/^\s*server_names_hash_bucket_size\s+[^;]+;/server_names_hash_bucket_size ${bucket};/" "$nginx_conf"
-    if grep -qE '^\s*server_names_hash_max_size' "$nginx_conf" 2>/dev/null; then
-      sed -i -E "s/^\s*server_names_hash_max_size\s+[^;]+;/server_names_hash_max_size ${max_size};/" "$nginx_conf"
-    else
-      sed -i "/^\s*server_names_hash_bucket_size/a server_names_hash_max_size ${max_size};" "$nginx_conf"
-    fi
-    rm -f "$conf_snippet" 2>/dev/null || true
-    return 0
-  fi
-
-  if (( patched )); then
-    return 0
+  if grep -qE '^\s*server_names_hash_max_size' "$nginx_conf" 2>/dev/null; then
+    sed -i -E 's/^\s*server_names_hash_max_size\s+[^;]+;/# server_names_hash_max_size (use conf.d);/' "$nginx_conf"
   fi
 
   cat >"$conf_snippet" <<EOF
@@ -201,9 +177,10 @@ test_and_reload_nginx() {
       systemctl reload nginx
       return 0
     fi
-    if grep -q 'duplicate' "$err" 2>/dev/null && grep -q '00-dockpilot-global' "$err" 2>/dev/null; then
-      log "Removing duplicate conf.d hash tuning (nginx.conf already sets it) ..."
-      rm -f /etc/nginx/conf.d/00-dockpilot-global.conf
+    if grep -q 'duplicate' "$err" 2>/dev/null && grep -q 'server_names_hash' "$err" 2>/dev/null; then
+      log "Fixing duplicate server_names_hash (comment nginx.conf, keep conf.d) ..."
+      sed -i -E 's/^\s*server_names_hash_bucket_size\s+[^;]+;/# server_names_hash_bucket_size (use conf.d);/' /etc/nginx/nginx.conf
+      sed -i -E 's/^\s*server_names_hash_max_size\s+[^;]+;/# server_names_hash_max_size (use conf.d);/' /etc/nginx/nginx.conf
       rm -f "$err"
       continue
     fi
@@ -241,9 +218,6 @@ enable_panel_nginx() {
 issue_panel_cert() {
   local domain="$1" email="$2"
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
-  if grep -qE '^\s*server_names_hash_bucket_size' /etc/nginx/nginx.conf 2>/dev/null; then
-    rm -f /etc/nginx/conf.d/00-dockpilot-global.conf 2>/dev/null || true
-  fi
   certbot --nginx -d "$domain" --non-interactive --agree-tos -m "$email" --redirect --no-eff-email
 }
 

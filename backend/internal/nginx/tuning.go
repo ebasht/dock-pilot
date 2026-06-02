@@ -53,80 +53,27 @@ server_names_hash_max_size %d;
 `, bucketSize, maxSize)
 }
 
-func (m *RealManager) nginxConfHostPath() string {
-	return m.host.ChrootPath("/etc/nginx/nginx.conf")
-}
-
 func (m *RealManager) globalTuningConfHostPath() string {
 	return m.host.ChrootPath(globalTuningHostPath)
 }
 
-// pruneDuplicateHashTuning removes conf.d hash snippet when nginx.conf already defines it.
-func (m *RealManager) pruneDuplicateHashTuning(ctx context.Context) {
-	nginxConf := m.nginxConfHostPath()
-	confPath := m.globalTuningConfHostPath()
+// Hash tuning lives only in conf.d; active directives in nginx.conf cause duplicate emerg on nginx -t.
+const commentNginxConfHashScript = `NGINX=/etc/nginx/nginx.conf
+[ -f "$NGINX" ] || exit 0
+sed -i -E 's/^\s*server_names_hash_bucket_size\s+[^;]+;/# server_names_hash_bucket_size (managed in conf.d);/' "$NGINX" 2>/dev/null || true
+sed -i -E 's/^\s*server_names_hash_max_size\s+[^;]+;/# server_names_hash_max_size (managed in conf.d);/' "$NGINX" 2>/dev/null || true
+`
 
-	b, err := os.ReadFile(nginxConf)
-	if err != nil || !nginxConfHasActiveHashBucket(string(b)) {
-		return
-	}
-	if err := m.host.Remove(confPath); err != nil {
-		if !os.IsNotExist(err) {
-			m.logger.WarnContext(ctx, "could not remove duplicate nginx hash conf.d",
-				"path", globalTuningHostPath,
-				"error", err,
-			)
-		}
-		return
-	}
-	m.logger.InfoContext(ctx, "removed duplicate nginx hash conf.d (nginx.conf already sets it)",
-		"path", globalTuningHostPath,
-	)
-}
-
-func patchNginxConfHashScript(bucket, maxSize int) string {
-	return fmt.Sprintf(`set -e
-NGINX=/etc/nginx/nginx.conf
-BUCKET=%d
-MAX=%d
-CONF=/etc/nginx/conf.d/00-dockpilot-global.conf
-rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
-if grep -qE '^\s*server_names_hash_bucket_size' "$NGINX" 2>/dev/null; then
-  sed -i -E "s/^\s*server_names_hash_bucket_size\s+[^;]+;/server_names_hash_bucket_size ${BUCKET};/" "$NGINX"
-elif grep -qE '^\s*#\s*server_names_hash_bucket_size' "$NGINX" 2>/dev/null; then
-  sed -i -E "s/^\s*#\s*server_names_hash_bucket_size\s+[^;]*;/server_names_hash_bucket_size ${BUCKET};/" "$NGINX"
-else
-  exit 1
-fi
-if grep -qE '^\s*server_names_hash_max_size' "$NGINX" 2>/dev/null; then
-  sed -i -E "s/^\s*server_names_hash_max_size\s+[^;]+;/server_names_hash_max_size ${MAX};/" "$NGINX"
-else
-  sed -i "/^\s*server_names_hash_bucket_size/a server_names_hash_max_size ${MAX};" "$NGINX"
-fi
-rm -f "$CONF"
-`, bucket, maxSize)
+func (m *RealManager) ensureConfOnlyHashTuning(ctx context.Context) error {
+	return m.host.RunShell(ctx, commentNginxConfHashScript)
 }
 
 func (m *RealManager) ensureGlobalTuning(ctx context.Context, domains []string) error {
 	bucket, maxSize := serverNamesHashSettings(domains)
 	confPath := m.globalTuningConfHostPath()
-	nginxConf := m.nginxConfHostPath()
 
-	m.pruneDuplicateHashTuning(ctx)
-
-	if b, err := os.ReadFile(nginxConf); err == nil && nginxConfHasActiveHashBucket(string(b)) {
-		return nil
-	}
-
-	if err := m.host.RunShell(ctx, patchNginxConfHashScript(bucket, maxSize)); err == nil {
-		if b, err := os.ReadFile(nginxConf); err == nil && nginxConfHasActiveHashBucket(string(b)) {
-			_ = m.host.Remove(confPath)
-			m.logger.InfoContext(ctx, "nginx hash tuning patched in nginx.conf",
-				"server_names_hash_bucket_size", bucket,
-				"server_names_hash_max_size", maxSize,
-			)
-			return nil
-		}
+	if err := m.ensureConfOnlyHashTuning(ctx); err != nil {
+		return fmt.Errorf("comment nginx.conf hash tuning: %w", err)
 	}
 
 	if err := m.host.MkdirAll(m.host.ChrootPath("/etc/nginx/conf.d"), 0o755); err != nil {
@@ -142,4 +89,15 @@ func (m *RealManager) ensureGlobalTuning(ctx context.Context, domains []string) 
 		"server_names_hash_max_size", maxSize,
 	)
 	return nil
+}
+
+// pruneDuplicateHashTuning comments nginx.conf hash lines when conf.d snippet is present.
+func (m *RealManager) pruneDuplicateHashTuning(ctx context.Context) {
+	confPath := m.globalTuningConfHostPath()
+	if _, err := os.Stat(confPath); err != nil {
+		return
+	}
+	if err := m.ensureConfOnlyHashTuning(ctx); err != nil {
+		m.logger.WarnContext(ctx, "could not comment nginx.conf hash tuning", "error", err)
+	}
 }
