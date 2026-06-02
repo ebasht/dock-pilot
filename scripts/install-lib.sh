@@ -129,6 +129,11 @@ apply_nginx_hash_tuning() {
 
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
 
+  # Installer sets hash in nginx.conf; API may leave conf.d — drop duplicate before nginx -t.
+  if grep -qE '^\s*server_names_hash_bucket_size' "$nginx_conf" 2>/dev/null; then
+    rm -f "$conf_snippet" 2>/dev/null || true
+  fi
+
   while IFS= read -r f; do
     [[ -n "$f" && -f "$f" ]] || continue
     [[ "$f" == "$conf_snippet" ]] && continue
@@ -236,6 +241,9 @@ enable_panel_nginx() {
 issue_panel_cert() {
   local domain="$1" email="$2"
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
+  if grep -qE '^\s*server_names_hash_bucket_size' /etc/nginx/nginx.conf 2>/dev/null; then
+    rm -f /etc/nginx/conf.d/00-dockpilot-global.conf 2>/dev/null || true
+  fi
   certbot --nginx -d "$domain" --non-interactive --agree-tos -m "$email" --redirect --no-eff-email
 }
 

@@ -160,6 +160,7 @@ func (m *RealManager) certificateExists(primaryDomain string) bool {
 }
 
 func (m *RealManager) TestConfig(ctx context.Context) error {
+	m.pruneDuplicateHashTuning(ctx)
 	m.logger.InfoContext(ctx, "nginx config test")
 	if err := m.host.Run(ctx, "nginx", "-t"); err != nil {
 		return fmt.Errorf("nginx -t: %w", err)

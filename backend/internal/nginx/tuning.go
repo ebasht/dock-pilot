@@ -28,14 +28,14 @@ func serverNamesHashSettings(domains []string) (bucketSize, maxSize int) {
 	for bucket < longest {
 		bucket *= 2
 	}
-	if bucket < 64 {
-		bucket = 64
+	if bucket < 128 {
+		bucket = 128
 	}
 
 	maxSize = 512
 	need := count * 128
-	if need < 512 {
-		need = 512
+	if need < 2048 {
+		need = 2048
 	}
 	for maxSize < need {
 		maxSize *= 2
@@ -53,18 +53,80 @@ server_names_hash_max_size %d;
 `, bucketSize, maxSize)
 }
 
-func (m *RealManager) ensureGlobalTuning(ctx context.Context, domains []string) error {
-	bucket, maxSize := serverNamesHashSettings(domains)
-	confPath := m.host.ChrootPath(globalTuningHostPath)
-	nginxConfPath := m.host.ChrootPath("/etc/nginx/nginx.conf")
+func (m *RealManager) nginxConfHostPath() string {
+	return m.host.ChrootPath("/etc/nginx/nginx.conf")
+}
 
-	if b, err := os.ReadFile(nginxConfPath); err == nil && nginxConfHasActiveHashBucket(string(b)) {
-		if err := m.host.Remove(confPath); err == nil {
-			m.logger.InfoContext(ctx, "nginx hash tuning already in nginx.conf — removed conf.d duplicate",
+func (m *RealManager) globalTuningConfHostPath() string {
+	return m.host.ChrootPath(globalTuningHostPath)
+}
+
+// pruneDuplicateHashTuning removes conf.d hash snippet when nginx.conf already defines it.
+func (m *RealManager) pruneDuplicateHashTuning(ctx context.Context) {
+	nginxConf := m.nginxConfHostPath()
+	confPath := m.globalTuningConfHostPath()
+
+	b, err := os.ReadFile(nginxConf)
+	if err != nil || !nginxConfHasActiveHashBucket(string(b)) {
+		return
+	}
+	if err := m.host.Remove(confPath); err != nil {
+		if !os.IsNotExist(err) {
+			m.logger.WarnContext(ctx, "could not remove duplicate nginx hash conf.d",
 				"path", globalTuningHostPath,
+				"error", err,
 			)
 		}
+		return
+	}
+	m.logger.InfoContext(ctx, "removed duplicate nginx hash conf.d (nginx.conf already sets it)",
+		"path", globalTuningHostPath,
+	)
+}
+
+func patchNginxConfHashScript(bucket, maxSize int) string {
+	return fmt.Sprintf(`set -e
+NGINX=/etc/nginx/nginx.conf
+BUCKET=%d
+MAX=%d
+CONF=/etc/nginx/conf.d/00-dockpilot-global.conf
+rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
+if grep -qE '^\s*server_names_hash_bucket_size' "$NGINX" 2>/dev/null; then
+  sed -i -E "s/^\s*server_names_hash_bucket_size\s+[^;]+;/server_names_hash_bucket_size ${BUCKET};/" "$NGINX"
+elif grep -qE '^\s*#\s*server_names_hash_bucket_size' "$NGINX" 2>/dev/null; then
+  sed -i -E "s/^\s*#\s*server_names_hash_bucket_size\s+[^;]*;/server_names_hash_bucket_size ${BUCKET};/" "$NGINX"
+else
+  exit 1
+fi
+if grep -qE '^\s*server_names_hash_max_size' "$NGINX" 2>/dev/null; then
+  sed -i -E "s/^\s*server_names_hash_max_size\s+[^;]+;/server_names_hash_max_size ${MAX};/" "$NGINX"
+else
+  sed -i "/^\s*server_names_hash_bucket_size/a server_names_hash_max_size ${MAX};" "$NGINX"
+fi
+rm -f "$CONF"
+`, bucket, maxSize)
+}
+
+func (m *RealManager) ensureGlobalTuning(ctx context.Context, domains []string) error {
+	bucket, maxSize := serverNamesHashSettings(domains)
+	confPath := m.globalTuningConfHostPath()
+	nginxConf := m.nginxConfHostPath()
+
+	m.pruneDuplicateHashTuning(ctx)
+
+	if b, err := os.ReadFile(nginxConf); err == nil && nginxConfHasActiveHashBucket(string(b)) {
 		return nil
+	}
+
+	if err := m.host.RunShell(ctx, patchNginxConfHashScript(bucket, maxSize)); err == nil {
+		if b, err := os.ReadFile(nginxConf); err == nil && nginxConfHasActiveHashBucket(string(b)) {
+			_ = m.host.Remove(confPath)
+			m.logger.InfoContext(ctx, "nginx hash tuning patched in nginx.conf",
+				"server_names_hash_bucket_size", bucket,
+				"server_names_hash_max_size", maxSize,
+			)
+			return nil
+		}
 	}
 
 	if err := m.host.MkdirAll(m.host.ChrootPath("/etc/nginx/conf.d"), 0o755); err != nil {
