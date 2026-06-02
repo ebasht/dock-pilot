@@ -120,6 +120,34 @@ download_release() {
   curl -fsSL "$url" -o "$dest"
 }
 
+write_nginx_global_tuning() {
+  local domain="$1"
+  local bucket=64
+  local len=${#domain}
+
+  rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
+
+  while (( bucket < len )); do
+    bucket=$((bucket * 2))
+  done
+  if (( bucket < 64 )); then
+    bucket=64
+  fi
+
+  # conf.d snippet is included in http{} — do not duplicate if already in nginx.conf.
+  if grep -qE '^\s*server_names_hash_bucket_size' /etc/nginx/nginx.conf 2>/dev/null; then
+    log "nginx.conf already sets server_names_hash_bucket_size (increase there if nginx -t fails)"
+    return 0
+  fi
+
+  cat > /etc/nginx/conf.d/00-dockpilot-global.conf <<EOF
+# Managed by dock-pilot — long server_name values (e.g. ${domain})
+server_names_hash_bucket_size ${bucket};
+server_names_hash_max_size 512;
+EOF
+  log "Wrote /etc/nginx/conf.d/00-dockpilot-global.conf (bucket=${bucket})"
+}
+
 write_panel_nginx() {
   local template="$1" domain="$2" api_port="$3" frontend_port="$4" out="$5"
   sed \
@@ -221,6 +249,7 @@ configure_panel_nginx() {
   [[ -f "$template" ]] || die "Missing ${template}"
 
   log "Writing panel nginx config for ${domain} (api=${api_port}, ui=${frontend_port}) ..."
+  write_nginx_global_tuning "$domain"
   write_panel_nginx "$template" "$domain" "$api_port" "$frontend_port" "$available"
   log "Enabling nginx site and reloading ..."
   enable_panel_nginx /etc/nginx/sites-available /etc/nginx/sites-enabled
