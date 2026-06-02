@@ -123,9 +123,10 @@ download_release() {
 write_nginx_global_tuning() {
   local domain="$1"
   local bucket=128
+  local max_size=2048
   local len=${#domain}
-  local nginx_conf="/etc/nginx/nginx.conf"
   local conf_snippet="/etc/nginx/conf.d/00-dockpilot-global.conf"
+  local patched=0 f
 
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
 
@@ -133,22 +134,29 @@ write_nginx_global_tuning() {
     bucket=$((bucket * 2))
   done
 
-  if grep -qE '^\s*server_names_hash_bucket_size' "$nginx_conf" 2>/dev/null; then
-    sed -i -E "s/^\s*server_names_hash_bucket_size\s+[^;]+;/server_names_hash_bucket_size ${bucket};/" "$nginx_conf"
-    if grep -qE '^\s*server_names_hash_max_size' "$nginx_conf" 2>/dev/null; then
-      sed -i -E "s/^\s*server_names_hash_max_size\s+[^;]+;/server_names_hash_max_size 1024;/" "$nginx_conf"
+  # Patch every file that already sets hash tuning (nginx.conf or conf.d).
+  # Skipping conf.d when nginx.conf has bucket 32 was the original failure mode.
+  while IFS= read -r f; do
+    [[ -n "$f" && -f "$f" ]] || continue
+    sed -i -E "s/^\s*server_names_hash_bucket_size\s+[^;]+;/server_names_hash_bucket_size ${bucket};/" "$f"
+    if grep -qE '^\s*server_names_hash_max_size' "$f" 2>/dev/null; then
+      sed -i -E "s/^\s*server_names_hash_max_size\s+[^;]+;/server_names_hash_max_size ${max_size};/" "$f"
     else
-      sed -i "/^\s*server_names_hash_bucket_size/a server_names_hash_max_size 1024;" "$nginx_conf"
+      sed -i "/^\s*server_names_hash_bucket_size/a server_names_hash_max_size ${max_size};" "$f"
     fi
+    patched=1
+    log "Updated server_names_hash_* in ${f} (bucket=${bucket})"
+  done < <(grep -rlE '^\s*server_names_hash_bucket_size' /etc/nginx/nginx.conf /etc/nginx/conf.d 2>/dev/null || true)
+
+  if (( patched )); then
     rm -f "$conf_snippet" 2>/dev/null || true
-    log "Updated server_names_hash_* in ${nginx_conf} (bucket=${bucket})"
     return 0
   fi
 
   cat >"$conf_snippet" <<EOF
 # Managed by dock-pilot — long server_name values (e.g. ${domain})
 server_names_hash_bucket_size ${bucket};
-server_names_hash_max_size 1024;
+server_names_hash_max_size ${max_size};
 EOF
   log "Wrote ${conf_snippet} (bucket=${bucket})"
 }
