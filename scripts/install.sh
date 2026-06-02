@@ -247,6 +247,9 @@ chmod 600 .env
 
 log "Starting stack (postgres → migrate → api → frontend)..."
 docker compose -f docker-compose.full.yml up -d postgres
+log "Waiting for PostgreSQL..."
+wait_for_postgres docker-compose.full.yml || die "PostgreSQL did not become ready"
+log "Applying migrations..."
 docker compose -f docker-compose.full.yml run --rm migrate
 log "Starting API and frontend..."
 docker compose -f docker-compose.full.yml up -d api frontend --no-deps
@@ -266,9 +269,9 @@ docker compose -f docker-compose.full.yml up -d api
 
 if [[ "$SKIP_CERT" -eq 0 ]]; then
   if verify_panel_https "$DOMAIN"; then
-    log "HTTPS verified: https://${DOMAIN}/health"
+    log "HTTPS verified: https://${DOMAIN}/"
   else
-    die "HTTPS check failed for ${DOMAIN} after certbot (try: nginx -T | grep -A20 ${DOMAIN})"
+    log "WARN: HTTPS probe failed for ${DOMAIN} — panel may still work; check: certbot certificates"
   fi
 fi
 

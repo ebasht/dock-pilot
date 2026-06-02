@@ -154,6 +154,17 @@ wait_for_api() {
   return 1
 }
 
+wait_for_postgres() {
+  local compose_file="$1" tries=45
+  while ((tries-- > 0)); do
+    if docker compose -f "$compose_file" exec -T postgres pg_isready -U dockpilot >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
 # True if something listens on this TCP port (any interface).
 port_in_use() {
   local port="$1"
