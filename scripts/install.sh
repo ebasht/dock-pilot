@@ -251,8 +251,33 @@ log "Waiting for PostgreSQL..."
 wait_for_postgres docker-compose.full.yml || die "PostgreSQL did not become ready"
 log "Applying migrations..."
 docker compose -f docker-compose.full.yml run --rm migrate
-log "Starting API and frontend..."
-docker compose -f docker-compose.full.yml up -d api frontend --no-deps
+start_api_frontend() {
+  local compose_file="docker-compose.full.yml"
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    log "Starting API and frontend (attempt ${attempt}, api=${API_PORT}, ui=${FRONTEND_PORT}) ..."
+    docker rm -f dock-pilot-api dock-pilot-frontend 2>/dev/null || true
+    if docker compose -f "$compose_file" up -d api frontend --no-deps 2>&1; then
+      return 0
+    fi
+    if port_in_use "$API_PORT"; then
+      API_PORT="$(pick_free_port "$((API_PORT + 1))")"
+      sed -i "s/^API_PORT=.*/API_PORT=${API_PORT}/" .env
+      log "Port busy — retrying API on ${API_PORT}"
+      continue
+    fi
+    if port_in_use "$FRONTEND_PORT"; then
+      FRONTEND_PORT="$(pick_free_port "$((FRONTEND_PORT + 1))")"
+      sed -i "s/^FRONTEND_PORT=.*/FRONTEND_PORT=${FRONTEND_PORT}/" .env
+      log "Port busy — retrying frontend on ${FRONTEND_PORT}"
+      continue
+    fi
+    log "docker compose up failed:"
+    docker compose -f "$compose_file" logs api --tail 30 2>&1 || true
+    return 1
+  done
+  die "Could not start API/frontend after 5 attempts (check: docker compose logs api)"
+}
 
 log "Waiting for API on 127.0.0.1:${API_PORT}/health ..."
 if ! wait_for_api "$API_PORT"; then
