@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ContainerLogStream } from "@/components/ContainerLogStream";
 import { DeploymentLogStream } from "@/components/DeploymentLogStream";
 import { SiteHealthPanel } from "@/components/SiteHealthPanel";
 import { SiteTabs } from "@/components/SiteTabs";
@@ -177,13 +176,11 @@ export default function SiteDetailPage() {
         )}
       </div>
 
-      <div className="card" style={{ marginTop: "1.5rem" }}>
-        <h3 style={{ marginTop: 0 }}>Container logs</h3>
-        <p style={{ color: "var(--muted)", fontSize: "0.875rem", margin: "0 0 0.75rem" }}>
-          stdout / stderr from the running Docker container (live tail).
-        </p>
-        <ContainerLogStream siteId={id} />
-      </div>
+      <p style={{ marginTop: "1.5rem" }}>
+        <Link href={`/sites/${id}/logs`} style={{ fontSize: "0.875rem" }}>
+          Container logs (stdout / stderr) →
+        </Link>
+      </p>
 
       {latestDep && (
         <div className="card" style={{ marginTop: "1.5rem" }}>

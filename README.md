@@ -270,6 +270,8 @@ docker-compose.yml
 | GET | `/api/sites/{id}` | Get site |
 | PATCH | `/api/sites/{id}` | Update site |
 | DELETE | `/api/sites/{id}` | Delete site |
+| GET | `/api/sites/{id}/health` | Site health (container + HTTP) |
+| GET | `/api/sites/{id}/logs/stream` | SSE container stdout/stderr (`?token=`) |
 | POST | `/api/sites/{id}/deploy` | Start deployment |
 | GET | `/api/sites/{id}/deployments` | List deployments |
 | GET | `/api/deployments/{id}/logs/stream` | SSE log stream |
