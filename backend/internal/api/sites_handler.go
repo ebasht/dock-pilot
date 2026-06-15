@@ -2,11 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/ebash/dock-pilot/backend/internal/healthcheck"
 	sitesvc "github.com/ebash/dock-pilot/backend/internal/sites"
 )
 
@@ -93,6 +95,55 @@ func (h *SitesHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *SitesHandler) Health(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUID(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, sitesvc.ErrInvalidInput)
+		return
+	}
+	result, err := h.sites.Health(r.Context(), id)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (h *SitesHandler) HealthAll(w http.ResponseWriter, r *http.Request) {
+	results, err := h.sites.HealthAll(r.Context())
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if results == nil {
+		results = []healthcheck.Result{}
+	}
+	writeJSON(w, http.StatusOK, results)
+}
+
+func (h *SitesHandler) StreamContainerLogs(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUID(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, sitesvc.ErrInvalidInput)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, fmt.Errorf("streaming not supported"))
+		return
+	}
+
+	tail := sitesvc.ParseLogTail(r.URL.Query().Get("tail"), 300)
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	_ = h.sites.StreamContainerLogs(r.Context(), id, tail, w, flusher)
 }
 
 func parseUUID(s string) (uuid.UUID, error) {

@@ -45,9 +45,12 @@ func NewRouter(h Handlers, apiToken string, corsOrigins []string) http.Handler {
 		r.Route("/sites", func(r chi.Router) {
 			r.Post("/", h.Sites.Create)
 			r.Get("/", h.Sites.List)
+			r.Get("/health", h.Sites.HealthAll)
 
 			r.Route("/{id}", func(r chi.Router) {
 				r.Get("/", h.Sites.Get)
+				r.Get("/health", h.Sites.Health)
+				r.Get("/logs/stream", h.Sites.StreamContainerLogs)
 				r.Patch("/", h.Sites.Update)
 				r.Delete("/", h.Sites.Delete)
 

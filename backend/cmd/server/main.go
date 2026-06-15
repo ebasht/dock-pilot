@@ -13,6 +13,7 @@ import (
 	"github.com/ebash/dock-pilot/backend/internal/config"
 	"github.com/ebash/dock-pilot/backend/internal/deployments"
 	"github.com/ebash/dock-pilot/backend/internal/docker"
+	"github.com/ebash/dock-pilot/backend/internal/healthcheck"
 	"github.com/ebash/dock-pilot/backend/internal/nginx"
 	"github.com/ebash/dock-pilot/backend/internal/secrets"
 	"github.com/ebash/dock-pilot/backend/internal/sites"
@@ -68,7 +69,8 @@ func main() {
 
 	logger.Info("deploy mode", "mode", cfg.Deploy.Mode, "work_dir", cfg.Deploy.WorkDir)
 
-	sitesSvc := sites.NewService(pool, queries)
+	healthChecker := healthcheck.NewChecker(dockerClient)
+	sitesSvc := sites.NewService(pool, queries, healthChecker, dockerClient)
 	secretsSvc := secrets.NewService(queries, cipher)
 	worker := deployments.NewWorker(queries, dockerClient, nginxMgr, sslMgr, secretsSvc, cfg.Deploy.WorkDir, logger)
 	deploySvc := deployments.NewService(queries, worker)

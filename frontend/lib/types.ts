@@ -8,6 +8,38 @@ export interface SiteListItem {
   updated_at: string;
 }
 
+export interface SiteHealthContainer {
+  found: boolean;
+  running: boolean;
+  state: string;
+  health: string;
+  container?: string;
+}
+
+export interface SiteHealthHTTP {
+  url: string;
+  status_code?: number;
+  ok: boolean;
+  error?: string;
+}
+
+export interface ContainerLogLine {
+  seq: number;
+  stream: string;
+  line: string;
+  time: string;
+}
+
+export interface SiteHealth {
+  site_id: string;
+  site_type: string;
+  overall: string;
+  message: string;
+  container?: SiteHealthContainer;
+  http?: SiteHealthHTTP;
+  checked_at: string;
+}
+
 export interface Domain {
   id?: string;
   domain: string;

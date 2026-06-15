@@ -14,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ebash/dock-pilot/backend/internal/db"
+	"github.com/ebash/dock-pilot/backend/internal/docker"
+	"github.com/ebash/dock-pilot/backend/internal/healthcheck"
 )
 
 var slugPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
@@ -21,10 +23,12 @@ var slugPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 type Service struct {
 	pool    *pgxpool.Pool
 	queries *db.Queries
+	health  *healthcheck.Checker
+	docker  docker.Client
 }
 
-func NewService(pool *pgxpool.Pool, queries *db.Queries) *Service {
-	return &Service{pool: pool, queries: queries}
+func NewService(pool *pgxpool.Pool, queries *db.Queries, checker *healthcheck.Checker, dockerClient docker.Client) *Service {
+	return &Service{pool: pool, queries: queries, health: checker, docker: dockerClient}
 }
 
 func (s *Service) Create(ctx context.Context, req CreateSiteRequest) (SiteResponse, error) {

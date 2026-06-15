@@ -1,15 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { HealthBadge } from "@/components/HealthBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, ApiError } from "@/lib/api";
-import type { SiteListItem } from "@/lib/types";
+import { siteUrlHref } from "@/lib/site-url";
+import type { SiteHealth, SiteListItem } from "@/lib/types";
 
 export default function SitesPage() {
   const [sites, setSites] = useState<SiteListItem[]>([]);
+  const [healthBySite, setHealthBySite] = useState<Record<string, SiteHealth>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const loadHealth = useCallback(async () => {
+    try {
+      const rows = await api.listSitesHealth();
+      const map: Record<string, SiteHealth> = {};
+      for (const h of rows) {
+        map[h.site_id] = h;
+      }
+      setHealthBySite(map);
+    } catch {
+      /* health is optional on list */
+    }
+  }, []);
 
   useEffect(() => {
     api
@@ -19,7 +35,10 @@ export default function SitesPage() {
         setError(e instanceof ApiError ? e.message : "Failed to load sites");
       })
       .finally(() => setLoading(false));
-  }, []);
+    loadHealth();
+    const t = setInterval(loadHealth, 30_000);
+    return () => clearInterval(t);
+  }, [loadHealth]);
 
   return (
     <div>
@@ -56,6 +75,7 @@ export default function SitesPage() {
                 <th>Name</th>
                 <th>Type</th>
                 <th>URL</th>
+                <th>Health</th>
                 <th>Status</th>
                 <th>Updated</th>
               </tr>
@@ -73,7 +93,30 @@ export default function SitesPage() {
                     {site.site_type === "telegram_bot" ? "Telegram bot" : "Website"}
                   </td>
                   <td>
-                    {site.site_type === "telegram_bot" ? "—" : site.primary_url}
+                    {site.site_type === "telegram_bot" ? (
+                      "—"
+                    ) : site.primary_url ? (
+                      <a
+                        href={siteUrlHref(site.primary_url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {site.primary_url}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td>
+                    {healthBySite[site.id] ? (
+                      <span title={healthBySite[site.id].message}>
+                        <HealthBadge overall={healthBySite[site.id].overall} />
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
+                        …
+                      </span>
+                    )}
                   </td>
                   <td>
                     <StatusBadge status={site.status} />

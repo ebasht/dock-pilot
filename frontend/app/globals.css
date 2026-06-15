@@ -157,6 +157,26 @@ h3 {
   color: #fca5a5;
 }
 
+.badge-health-healthy {
+  background: #14532d;
+  color: #86efac;
+}
+
+.badge-health-degraded {
+  background: #422006;
+  color: #fde047;
+}
+
+.badge-health-unhealthy {
+  background: #450a0a;
+  color: #fca5a5;
+}
+
+.badge-health-unknown {
+  background: #374151;
+  color: #d1d5db;
+}
+
 .log-viewer {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.8rem;

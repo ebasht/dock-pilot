@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { ContainerLogStream } from "@/components/ContainerLogStream";
 import { DeploymentLogStream } from "@/components/DeploymentLogStream";
+import { SiteHealthPanel } from "@/components/SiteHealthPanel";
 import { SiteTabs } from "@/components/SiteTabs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, ApiError } from "@/lib/api";
@@ -106,7 +108,9 @@ export default function SiteDetailPage() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="grid-2">
+      <SiteHealthPanel siteId={id} />
+
+      <div className="grid-2" style={{ marginTop: "1.5rem" }}>
         <div className="card">
           <h3>Configuration</h3>
           <dl>
@@ -171,6 +175,14 @@ export default function SiteDetailPage() {
             </Link>
           </div>
         )}
+      </div>
+
+      <div className="card" style={{ marginTop: "1.5rem" }}>
+        <h3 style={{ marginTop: 0 }}>Container logs</h3>
+        <p style={{ color: "var(--muted)", fontSize: "0.875rem", margin: "0 0 0.75rem" }}>
+          stdout / stderr from the running Docker container (live tail).
+        </p>
+        <ContainerLogStream siteId={id} />
       </div>
 
       {latestDep && (

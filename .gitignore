@@ -23,4 +23,7 @@ dist/
 *.tar.gz
 *.log
 
+# Local prompts (not for repo)
+landing-page.prompt.md
+
 .cu

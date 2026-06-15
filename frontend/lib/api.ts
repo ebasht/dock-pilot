@@ -9,6 +9,7 @@ import type {
   Deployment,
   SecretMeta,
   Site,
+  SiteHealth,
   SiteListItem,
 } from "./types";
 
@@ -116,6 +117,15 @@ export async function verifyApiToken(token: string): Promise<VerifyResult> {
 
 export const api = {
   listSites: () => request<SiteListItem[]>("/api/sites"),
+
+  listSitesHealth: () => request<SiteHealth[]>("/api/sites/health"),
+
+  getSiteHealth: (id: string) => request<SiteHealth>(`/api/sites/${id}/health`),
+
+  streamSiteContainerLogs: (siteId: string, tail = 300) =>
+    new EventSource(
+      streamURL(`/api/sites/${siteId}/logs/stream?tail=${tail}`),
+    ),
 
   getSite: (id: string) =>
     request<Site>(`/api/sites/${id}`).then(normalizeSite),
