@@ -1,6 +1,6 @@
 # DockPilot
 
-MVP platform for managing Docker-based websites on a VPS. A Next.js web UI talks to a Go API that manages sites, deployments, containers, nginx, and SSL certificates.
+Platform for managing Docker-based websites on a VPS. A Next.js web UI talks to a Go API that manages sites, deployments, containers, nginx, and SSL certificates.
 
 ## Stack
 
@@ -74,12 +74,16 @@ postgres://dockpilot:dockpilot@localhost:5432/dockpilot?sslmode=disable
 ```bash
 curl -fsSL -H "Accept: application/vnd.github.raw+json" \
   "https://api.github.com/repos/e-bashtan/dock-pilot/contents/scripts/install.sh?ref=main" \
-  | sudo bash -s -- \
+  -o /tmp/dock-pilot-install.sh
+
+sudo bash /tmp/dock-pilot-install.sh \
   --domain deploy.example.com \
   --email you@example.com \
   --version v0.1.0 \
   --skip-packages
 ```
+
+> Не используйте `curl | bash` — `docker compose run` может съесть stdin и оборвать установку после миграций. Сохраняйте скрипт в файл (`-o`), как выше.
 
 > `raw.githubusercontent.com` может отдавать устаревший `install.sh` (CDN). Используйте GitHub API (команда выше) или `cdn.jsdelivr.net/gh/e-bashtan/dock-pilot@main/scripts/install.sh`.
 
@@ -98,7 +102,9 @@ curl -fsSL -H "Accept: application/vnd.github.raw+json" \
 ```bash
 curl -fsSL -H "Accept: application/vnd.github.raw+json" \
   "https://api.github.com/repos/e-bashtan/dock-pilot/contents/scripts/install.sh?ref=main" \
-  | sudo bash -s -- \
+  -o /tmp/dock-pilot-install.sh
+
+sudo bash /tmp/dock-pilot-install.sh \
   --domain panel.example.com \
   --email you@example.com \
   --version v0.1.0 \

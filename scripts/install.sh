@@ -3,7 +3,8 @@
 #
 #   curl -fsSL -H "Accept: application/vnd.github.raw+json" \
 #     "https://api.github.com/repos/e-bashtan/dock-pilot/contents/scripts/install.sh?ref=main" \
-#     | sudo bash -s -- --domain deploy.example.com --email you@example.com
+#     -o /tmp/dock-pilot-install.sh
+#   sudo bash /tmp/dock-pilot-install.sh --domain deploy.example.com --email you@example.com
 #
 set -euo pipefail
 
@@ -58,6 +59,15 @@ parse_args() {
 }
 
 parse_args "$@"
+
+# curl | bash: docker compose run reads stdin and consumes the rest of this script.
+if [[ -p /dev/stdin && -z "${DOCK_PILOT_INSTALL_REEXECED:-}" ]]; then
+  export DOCK_PILOT_INSTALL_REEXECED=1
+  _install_copy="$(mktemp)"
+  cat >"$_install_copy"
+  chmod 700 "$_install_copy"
+  exec bash "$_install_copy" "$@"
+fi
 
 # --- Bootstrap: download release when not yet on disk (curl | bash) ---
 if [[ -z "$FROM_DIR" && ! -f "${INSTALL_DIR}/docker-compose.full.yml" ]]; then
@@ -276,7 +286,7 @@ write_credentials_file "$INSTALL_DIR" "$PANEL_URL" "$API_TOKEN"
 run_migrate() {
   log "Applying migrations..."
   set +e
-  docker compose -f docker-compose.full.yml run --rm migrate
+  docker compose -f docker-compose.full.yml run --rm -T migrate
   local rc=$?
   set -e
   if [[ $rc -eq 0 ]]; then

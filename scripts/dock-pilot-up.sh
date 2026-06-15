@@ -34,7 +34,7 @@ echo "Starting PostgreSQL..."
 docker compose -f "$COMPOSE_FILE" up -d postgres
 
 echo "Applying migrations..."
-docker compose -f "$COMPOSE_FILE" run --rm migrate
+docker compose -f "$COMPOSE_FILE" run --rm -T migrate
 
 echo "Starting API and frontend..."
 docker compose -f "$COMPOSE_FILE" up -d api frontend
