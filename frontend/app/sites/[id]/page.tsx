@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { ContainerLogStream } from "@/components/ContainerLogStream";
 import { DeploymentLogStream } from "@/components/DeploymentLogStream";
 import { SiteHealthPanel } from "@/components/SiteHealthPanel";
 import { SiteTabs } from "@/components/SiteTabs";
@@ -176,11 +177,35 @@ export default function SiteDetailPage() {
         )}
       </div>
 
-      <p style={{ marginTop: "1.5rem" }}>
-        <Link href={`/sites/${id}/logs`} style={{ fontSize: "0.875rem" }}>
-          Container logs (stdout / stderr) →
-        </Link>
-      </p>
+      {site.site_type === "telegram_bot" && (
+        <div className="card" style={{ marginTop: "1.5rem" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "0.75rem",
+            }}
+          >
+            <h3 style={{ margin: 0 }}>Container logs</h3>
+            <Link href={`/sites/${id}/logs`} style={{ fontSize: "0.875rem" }}>
+              Open in Logs tab →
+            </Link>
+          </div>
+          <p style={{ color: "var(--muted)", fontSize: "0.875rem", margin: "0 0 0.75rem" }}>
+            stdout / stderr from the bot container (live).
+          </p>
+          <ContainerLogStream siteId={id} />
+        </div>
+      )}
+
+      {site.site_type === "web" && (
+        <p style={{ marginTop: "1.5rem" }}>
+          <Link href={`/sites/${id}/logs`} style={{ fontSize: "0.875rem" }}>
+            Container logs (stdout / stderr) →
+          </Link>
+        </p>
+      )}
 
       {latestDep && (
         <div className="card" style={{ marginTop: "1.5rem" }}>

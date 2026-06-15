@@ -20,22 +20,40 @@ export function SiteTabs({
   active: string;
 }) {
   return (
-    <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+    <nav
+      className="site-tabs"
+      aria-label="Site sections"
+      style={{
+        display: "flex",
+        gap: "0.25rem",
+        marginBottom: "1.5rem",
+        flexWrap: "wrap",
+        borderBottom: "1px solid var(--border)",
+        paddingBottom: "0.5rem",
+      }}
+    >
       {tabs.map((tab) => {
         const isActive = active === tab.key;
         return (
           <Link
             key={tab.key}
             href={tab.href(siteId)}
+            className={isActive ? "site-tab site-tab-active" : "site-tab"}
             style={{
-              fontWeight: isActive ? 600 : 400,
+              display: "inline-block",
+              padding: "0.35rem 0.75rem",
+              borderRadius: "var(--radius)",
+              fontWeight: isActive ? 600 : 500,
+              fontSize: "0.875rem",
               color: isActive ? "var(--text)" : "var(--muted)",
+              background: isActive ? "var(--surface-hover)" : "transparent",
+              border: isActive ? "1px solid var(--border)" : "1px solid transparent",
             }}
           >
             {tab.label}
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }
