@@ -69,8 +69,23 @@ fix_nginx_no_ipv6() {
   log "IPv6 not available on this host — commenting out listen [::] in nginx configs"
   while IFS= read -r f; do
     [[ -f "$f" ]] || continue
-    sed -i -E 's/^\s*listen\s+\[::\]:/# listen [::]:/' "$f"
-  done < <(find /etc/nginx -name '*.conf' -type f 2>/dev/null || true)
+    [[ "$f" == *".dpkg-"* ]] && continue
+    if grep -qE '^\s*listen\s+\[::\]:' "$f" 2>/dev/null; then
+      sed -i -E 's/^\s*listen\s+\[::\]:/# listen [::]:/' "$f"
+      log "  patched: $f"
+    fi
+  done < <(find /etc/nginx -type f 2>/dev/null || true)
+}
+
+log_nginx_ipv6_listeners() {
+  local hits
+  hits="$(grep -rnE '^\s*listen\s+\[::\]:' /etc/nginx 2>/dev/null | head -5 || true)"
+  if [[ -n "$hits" ]]; then
+    log "Remaining listen [::] directives:"
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && log "  $line"
+    done <<<"$hits"
+  fi
 }
 
 block_service_starts() {
@@ -124,6 +139,7 @@ install_nginx_package() {
   fix_nginx_no_ipv6
   if ! nginx -t; then
     log "nginx -t failed after IPv6 fix — check /etc/nginx"
+    log_nginx_ipv6_listeners
     return 1
   fi
   systemctl enable nginx 2>/dev/null || true
