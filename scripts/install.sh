@@ -216,6 +216,7 @@ if postgres_volume_exists && [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
   die "Postgres volume exists but POSTGRES_PASSWORD missing in .env — re-run with --reset-db or restore .env"
 fi
 
+log "Generating secrets and writing .env ..."
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(rand_postgres_password 24)}"
 SECRETS_KEY="${SECRETS_ENCRYPTION_KEY:-$(rand_secret 32)}"
 API_TOKEN="${API_TOKEN:-$(rand_secret 32)}"

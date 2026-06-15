@@ -12,17 +12,30 @@ need_root() {
 }
 
 rand_secret() {
-  local n="${1:-32}"
+  local n="${1:-32}" raw
   if command -v openssl >/dev/null 2>&1; then
-    openssl rand -base64 48 | tr -dc 'A-Za-z0-9!@#%^&*-_=+' | head -c "$n"
+    raw="$(openssl rand -base64 64 | tr -dc 'A-Za-z0-9!@#%^&*-_=+')"
+    echo -n "${raw:0:n}"
   else
+  (
+    set +o pipefail
     tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$n"
+  )
   fi
 }
 
 # Postgres password is embedded in DATABASE_URL — must be URL-safe (no @ : / # etc).
 rand_postgres_password() {
-  tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-24}"
+  local n="${1:-24}" hex
+  if command -v openssl >/dev/null 2>&1; then
+    hex="$(openssl rand -hex "$(( (n + 1) / 2 ))")"
+    echo -n "${hex:0:n}"
+  else
+  (
+    set +o pipefail
+    tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$n"
+  )
+  fi
 }
 
 detect_os() {
