@@ -56,3 +56,4 @@ sed -i "s|^CORS_ALLOWED_ORIGINS=.*|CORS_ALLOWED_ORIGINS=${PANEL_URL}|" .env
 docker compose -f docker-compose.full.yml up -d api 2>/dev/null \
   || docker compose -f docker-compose.dock-pilot.yml up -d api
 log "Panel: ${PANEL_URL}"
+[[ -n "${API_TOKEN:-}" ]] && write_credentials_file "$ROOT" "$PANEL_URL" "$API_TOKEN"

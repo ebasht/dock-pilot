@@ -271,6 +271,7 @@ MIGRATE_IMAGE=dock-pilot-migrate:latest
 EOF
 chmod 600 .env
 log "Wrote ${INSTALL_DIR}/.env (api=${API_PORT}, ui=${FRONTEND_PORT})"
+write_credentials_file "$INSTALL_DIR" "$PANEL_URL" "$API_TOKEN"
 
 run_migrate() {
   log "Applying migrations..."
@@ -350,13 +351,7 @@ if [[ "$SKIP_CERT" -eq 0 ]]; then
 fi
 
 CREDENTIALS="${INSTALL_DIR}/credentials.txt"
-cat > "$CREDENTIALS" <<EOF
-DockPilot — $(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-Panel URL:  ${PANEL_URL}
-API token:  ${API_TOKEN}
-EOF
-chmod 600 "$CREDENTIALS"
+write_credentials_file "$INSTALL_DIR" "$PANEL_URL" "$API_TOKEN"
 
 cat <<EOF
 

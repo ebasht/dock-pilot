@@ -5,6 +5,19 @@ set -euo pipefail
 log() { echo "[dock-pilot] $*"; }
 die() { echo "[dock-pilot] ERROR: $*" >&2; exit 1; }
 
+write_credentials_file() {
+  local install_dir="$1" panel_url="$2" api_token="$3"
+  local cred="${install_dir}/credentials.txt"
+  cat >"$cred" <<EOF
+DockPilot — $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+Panel URL:  ${panel_url}
+API token:  ${api_token}
+EOF
+  chmod 600 "$cred"
+  log "Saved credentials to ${cred}"
+}
+
 need_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
     die "Run as root: sudo $0 $*"
