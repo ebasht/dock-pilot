@@ -54,6 +54,25 @@ apt_install() {
   }
 }
 
+# Many VPS have no IPv6 — default Ubuntu nginx listens on [::]:80 and fails to start.
+ipv6_available() {
+  [[ -f /proc/net/if_inet6 ]] || return 1
+  [[ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null)" == "1" ]] && return 1
+  return 0
+}
+
+fix_nginx_no_ipv6() {
+  if ipv6_available; then
+    return 0
+  fi
+  local f
+  log "IPv6 not available on this host — commenting out listen [::] in nginx configs"
+  while IFS= read -r f; do
+    [[ -f "$f" ]] || continue
+    sed -i -E 's/^\s*listen\s+\[::\]:/# listen [::]:/' "$f"
+  done < <(find /etc/nginx -name '*.conf' -type f 2>/dev/null || true)
+}
+
 install_packages() {
   if host_prereqs_met; then
     log "docker, compose, nginx, and certbot already present — skipping apt"
@@ -70,9 +89,15 @@ install_packages() {
       apt_install ca-certificates curl gnupg lsb-release || return 1
 
       if ! command -v nginx >/dev/null 2>&1; then
-        apt_install nginx || return 1
+        if ! apt_install nginx; then
+          fix_nginx_no_ipv6
+          apt-get install -y -f -qq 2>/dev/null || apt --fix-broken install -y -qq || true
+          apt_install nginx || return 1
+        fi
+        fix_nginx_no_ipv6
       else
         log "nginx already installed — skipping"
+        fix_nginx_no_ipv6
       fi
 
       if ! command -v certbot >/dev/null 2>&1; then
@@ -211,6 +236,7 @@ enable_panel_nginx() {
   local available="$1" enabled="$2" domain="$3" name="dockpilot-panel.conf"
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
   rm -f "${enabled}/default" "${enabled}/default.conf" 2>/dev/null || true
+  fix_nginx_no_ipv6
   ln -sf "$available/$name" "$enabled/$name"
   test_and_reload_nginx "$domain"
 }
