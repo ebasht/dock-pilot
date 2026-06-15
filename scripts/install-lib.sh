@@ -43,6 +43,11 @@ host_prereqs_met() {
     && command -v certbot >/dev/null 2>&1
 }
 
+ensure_docker_nginx_running() {
+  systemctl enable docker nginx 2>/dev/null || true
+  systemctl start docker nginx 2>/dev/null || true
+}
+
 apt_install() {
   # shellcheck disable=SC2068
   apt-get install -y -qq "$@" || {
@@ -150,6 +155,7 @@ install_nginx_package() {
 install_packages() {
   if host_prereqs_met; then
     log "docker, compose, nginx, and certbot already present — skipping apt"
+    ensure_docker_nginx_running
     return 0
   fi
 
@@ -190,7 +196,7 @@ install_packages() {
       fi
 
       systemctl enable docker nginx 2>/dev/null || true
-      systemctl start docker nginx 2>/dev/null || true
+      ensure_docker_nginx_running
       ;;
     *)
       die "Unsupported OS: $os (need Ubuntu/Debian). Install docker, nginx, certbot manually."

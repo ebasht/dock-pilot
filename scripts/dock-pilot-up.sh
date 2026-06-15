@@ -4,7 +4,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-COMPOSE_FILE="${DOCK_PILOT_COMPOSE:-docker-compose.dock-pilot.yml}"
+COMPOSE_FILE="${DOCK_PILOT_COMPOSE:-}"
+if [[ -z "$COMPOSE_FILE" ]]; then
+  if [[ -f docker-compose.full.yml ]]; then
+    COMPOSE_FILE=docker-compose.full.yml
+  else
+    COMPOSE_FILE=docker-compose.dock-pilot.yml
+  fi
+fi
 
 if [[ ! -f .env ]]; then
   echo "Create .env from .env.dock-pilot.example first." >&2

@@ -192,6 +192,7 @@ else
   log "Loading Docker images..."
   gunzip -c "$IMAGES" | docker load
 fi
+log "Docker images ready"
 
 # Re-run must not rotate Postgres password: the data volume keeps the first password.
 if [[ -f .env ]]; then
@@ -268,6 +269,7 @@ FRONTEND_IMAGE=dock-pilot-frontend:latest
 MIGRATE_IMAGE=dock-pilot-migrate:latest
 EOF
 chmod 600 .env
+log "Wrote ${INSTALL_DIR}/.env (api=${API_PORT}, ui=${FRONTEND_PORT})"
 
 run_migrate() {
   log "Applying migrations..."
