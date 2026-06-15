@@ -73,6 +73,64 @@ fix_nginx_no_ipv6() {
   done < <(find /etc/nginx -name '*.conf' -type f 2>/dev/null || true)
 }
 
+block_service_starts() {
+  printf '%s\n' '#!/bin/sh' 'exit 101' > /usr/sbin/policy-rc.d
+  chmod +x /usr/sbin/policy-rc.d
+}
+
+unblock_service_starts() {
+  rm -f /usr/sbin/policy-rc.d
+}
+
+repair_apt_if_needed() {
+  fix_nginx_no_ipv6
+  if dpkg --audit 2>/dev/null | grep -q .; then
+    log "Repairing interrupted apt/dpkg state..."
+    block_service_starts
+    apt-get install -y -f -qq 2>/dev/null || apt --fix-broken install -y -qq || true
+    dpkg --configure -a 2>/dev/null || true
+    unblock_service_starts
+    fix_nginx_no_ipv6
+  fi
+}
+
+install_nginx_package() {
+  if command -v nginx >/dev/null 2>&1 \
+    && nginx -t >/dev/null 2>&1; then
+    fix_nginx_no_ipv6
+    return 0
+  fi
+
+  if ipv6_available; then
+    apt_install nginx
+    return $?
+  fi
+
+  log "Installing nginx (deferring service start until [::] listeners are disabled)..."
+  repair_apt_if_needed
+  block_service_starts
+  if ! apt_install nginx; then
+    unblock_service_starts
+    fix_nginx_no_ipv6
+    block_service_starts
+    apt-get install -y -f -qq 2>/dev/null || apt --fix-broken install -y -qq || true
+    dpkg --configure -a 2>/dev/null || true
+    apt_install nginx || {
+      unblock_service_starts
+      return 1
+    }
+  fi
+  unblock_service_starts
+  fix_nginx_no_ipv6
+  if ! nginx -t; then
+    log "nginx -t failed after IPv6 fix — check /etc/nginx"
+    return 1
+  fi
+  systemctl enable nginx 2>/dev/null || true
+  systemctl start nginx 2>/dev/null || true
+  return 0
+}
+
 install_packages() {
   if host_prereqs_met; then
     log "docker, compose, nginx, and certbot already present — skipping apt"
@@ -88,13 +146,10 @@ install_packages() {
 
       apt_install ca-certificates curl gnupg lsb-release || return 1
 
-      if ! command -v nginx >/dev/null 2>&1; then
-        if ! apt_install nginx; then
-          fix_nginx_no_ipv6
-          apt-get install -y -f -qq 2>/dev/null || apt --fix-broken install -y -qq || true
-          apt_install nginx || return 1
-        fi
-        fix_nginx_no_ipv6
+      repair_apt_if_needed
+
+      if ! command -v nginx >/dev/null 2>&1 || ! nginx -t >/dev/null 2>&1; then
+        install_nginx_package || return 1
       else
         log "nginx already installed — skipping"
         fix_nginx_no_ipv6
