@@ -85,7 +85,7 @@ func httpClientFor(proxyURL string) *http.Client {
 		TLSHandshakeTimeout: 10 * time.Second,
 	}
 	for _, candidate := range []string{proxyURL, telegramProxyFromEnv()} {
-		if applyProxyToTransport(transport, baseDialer, candidate) {
+		if applyProxyToTransport(transport, baseDialer, resolveTelegramProxyURL(candidate)) {
 			break
 		}
 	}
@@ -137,6 +137,34 @@ func telegramProxyFromEnv() string {
 		return v
 	}
 	return strings.TrimSpace(os.Getenv("HTTPS_PROXY"))
+}
+
+// resolveTelegramProxyURL rewrites socks5://127.0.0.1 (localhost on the VPS) to the
+// in-compose relay on the Docker bridge gateway — API runs in bridge network and
+// cannot reach the host loopback directly.
+func resolveTelegramProxyURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "socks5" {
+		return raw
+	}
+	host := u.Hostname()
+	if host != "127.0.0.1" && host != "localhost" {
+		return raw
+	}
+	relayHost := strings.TrimSpace(os.Getenv("TELEGRAM_SOCKS_RELAY_HOST"))
+	if relayHost == "" {
+		relayHost = "172.17.0.1"
+	}
+	relayPort := strings.TrimSpace(os.Getenv("TELEGRAM_SOCKS_RELAY_PORT"))
+	if relayPort == "" {
+		relayPort = "1081"
+	}
+	u.Host = net.JoinHostPort(relayHost, relayPort)
+	return u.String()
 }
 
 func escapeHTML(s string) string {

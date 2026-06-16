@@ -56,6 +56,8 @@ services:
       NGINX_SITES_ENABLED: ${NGINX_SITES_ENABLED:-/host/etc/nginx/sites-enabled}
       CERTBOT_EMAIL: ${CERTBOT_EMAIL:?set CERTBOT_EMAIL}
       TELEGRAM_HTTP_PROXY: ${TELEGRAM_HTTP_PROXY:-}
+      TELEGRAM_SOCKS_RELAY_HOST: ${TELEGRAM_SOCKS_RELAY_HOST:-172.17.0.1}
+      TELEGRAM_SOCKS_RELAY_PORT: ${TELEGRAM_SOCKS_RELAY_PORT:-1081}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       HTTP_PROXY: ${HTTP_PROXY:-}
     ports:
@@ -76,6 +78,16 @@ services:
       - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - api
+
+  # Forwards Docker bridge → host loopback so API can use socks5://127.0.0.1:1080 like host-network bots.
+  telegram-socks-relay:
+    image: alpine/socat:1.0.5
+    container_name: dock-pilot-telegram-socks-relay
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - TCP-LISTEN:${TELEGRAM_SOCKS_RELAY_PORT:-1081},bind=${TELEGRAM_SOCKS_RELAY_BIND:-172.17.0.1},fork,reuseaddr
+      - TCP:${TELEGRAM_SOCKS_UPSTREAM:-127.0.0.1:1080}
 
 volumes:
   dock_pilot_pg:

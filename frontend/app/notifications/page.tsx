@@ -189,8 +189,8 @@ export default function NotificationsPage() {
             onChange={(e) => setTelegramHTTPProxy(e.target.value)}
           />
           <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
-            Нужен, если VPS не достучится до api.telegram.org (таймаут). Поддерживаются
-            socks5, http и https (например socks5://127.0.0.1:1080).
+            Нужен, если VPS не достучится до api.telegram.org (таймаут). Укажите тот же
+            SOCKS, что и для ботов на хосте, например socks5://127.0.0.1:1080.
           </p>
         </div>
 
