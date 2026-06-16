@@ -8,6 +8,7 @@ import {
   setApiToken,
 } from "@/lib/auth-token";
 import { getApiBase, verifyApiToken } from "@/lib/api";
+import { AppVersion } from "@/components/AppVersion";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -70,7 +71,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="auth-screen">
         <div className="card auth-card">
-          <h1>DockPilot</h1>
+          <h1>
+            DockPilot <AppVersion />
+          </h1>
           <p className="auth-hint">
             Enter the API token to access the control panel. The token is stored
             in this browser session only.

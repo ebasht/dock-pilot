@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AppVersion } from "@/components/AppVersion";
 import { useLogout } from "@/components/AuthGate";
 
 export function Nav() {
@@ -9,7 +10,7 @@ export function Nav() {
   return (
     <nav className="nav">
       <Link href="/sites" className="nav-brand">
-        DockPilot
+        DockPilot <AppVersion />
       </Link>
       <div className="nav-links">
         <Link href="/sites">Sites</Link>

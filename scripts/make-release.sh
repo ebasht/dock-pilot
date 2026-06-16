@@ -18,6 +18,7 @@ log() { echo "[release] $*"; }
 
 log "Building Docker images (NEXT_PUBLIC_API_URL=auto)..."
 export NEXT_PUBLIC_API_URL=auto
+export NEXT_PUBLIC_APP_VERSION="${VERSION}"
 export DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 "$ROOT/scripts/docker-export.sh"
 

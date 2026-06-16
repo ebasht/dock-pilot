@@ -16,4 +16,5 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-auto}
         NEXT_PUBLIC_API_TOKEN: ${NEXT_PUBLIC_API_TOKEN:-}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-}
     image: ${FRONTEND_IMAGE:-dock-pilot-frontend:latest}
