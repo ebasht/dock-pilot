@@ -11,6 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const ensureNotificationSettings = `-- name: EnsureNotificationSettings :one
+INSERT INTO notification_settings (id) VALUES (1)
+ON CONFLICT (id) DO UPDATE SET updated_at = notification_settings.updated_at
+RETURNING id, enabled, telegram_chat_id, daily_digest_enabled, daily_digest_hour, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at
+`
+
+func (q *Queries) EnsureNotificationSettings(ctx context.Context) (NotificationSettings, error) {
+	row := q.db.QueryRow(ctx, ensureNotificationSettings)
+	return scanNotificationSettings(row)
+}
+
 const getNotificationSettings = `-- name: GetNotificationSettings :one
 SELECT id, enabled, telegram_chat_id, daily_digest_enabled, daily_digest_hour, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at FROM notification_settings WHERE id = 1
 `

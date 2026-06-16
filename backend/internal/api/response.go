@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	deploysvc "github.com/ebash/dock-pilot/backend/internal/deployments"
 	notifpkg "github.com/ebash/dock-pilot/backend/internal/notifications"
@@ -38,9 +39,21 @@ func writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, sitesvc.ErrInvalidInput),
 		errors.Is(err, secretpkg.ErrInvalidInput),
 		errors.Is(err, notifpkg.ErrInvalidInput),
-		errors.Is(err, notifpkg.ErrNotConfigured):
+		errors.Is(err, notifpkg.ErrNotConfigured),
+		errors.Is(err, notifpkg.ErrMigration):
 		status = http.StatusBadRequest
 		msg = err.Error()
+	default:
+		if err != nil && err.Error() != "" {
+			// Authenticated API — surface actionable errors (Telegram, decrypt, DB hints).
+			msg = err.Error()
+			lower := strings.ToLower(msg)
+			if strings.Contains(lower, "telegram") ||
+				strings.Contains(lower, "decrypt") ||
+				strings.Contains(lower, "migration") {
+				status = http.StatusBadRequest
+			}
+		}
 	}
 
 	writeJSON(w, status, errorBody{Error: msg})

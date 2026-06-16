@@ -59,6 +59,7 @@ export default function NotificationsPage() {
     e.preventDefault();
     setSaving(true);
     setSaved(false);
+    setTestOk(false);
     setError(null);
     try {
       const updated = await api.updateNotificationSettings(buildPayload());
@@ -77,16 +78,21 @@ export default function NotificationsPage() {
   const handleTest = async () => {
     setTesting(true);
     setTestOk(false);
+    setSaved(false);
     setError(null);
     try {
       if (
         settings &&
         (telegramBotToken.trim() ||
           telegramChatID.trim() !== settings.telegram_chat_id ||
-          enabled !== settings.enabled)
+          enabled !== settings.enabled ||
+          dailyDigestEnabled !== settings.daily_digest_enabled ||
+          dailyDigestHour !== settings.daily_digest_hour ||
+          alertOnIncident !== settings.alert_on_incident_enabled)
       ) {
-        await api.updateNotificationSettings(buildPayload());
-        await load();
+        const updated = await api.updateNotificationSettings(buildPayload());
+        setSettings(updated);
+        setTokenSet(updated.telegram_bot_token_set);
       }
       await api.sendNotificationTest();
       setTestOk(true);

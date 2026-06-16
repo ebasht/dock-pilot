@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/ebash/dock-pilot/backend/internal/db"
@@ -34,22 +35,16 @@ func NewService(queries *db.Queries, cipher *secrets.Cipher, sites *sitesvc.Serv
 }
 
 func (s *Service) GetSettings(ctx context.Context) (SettingsResponse, error) {
-	row, err := s.queries.GetNotificationSettings(ctx)
+	row, err := s.getSettingsRow(ctx)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return SettingsResponse{}, ErrNotFound
-		}
 		return SettingsResponse{}, err
 	}
 	return toSettingsResponse(row), nil
 }
 
 func (s *Service) UpdateSettings(ctx context.Context, req UpdateSettingsRequest) (SettingsResponse, error) {
-	current, err := s.queries.GetNotificationSettings(ctx)
+	current, err := s.getSettingsRow(ctx)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return SettingsResponse{}, ErrNotFound
-		}
 		return SettingsResponse{}, err
 	}
 
@@ -90,7 +85,10 @@ func (s *Service) SendTest(ctx context.Context) error {
 		return err
 	}
 	text := "<b>DockPilot</b>\nТестовое уведомление — Telegram настроен."
-	return s.telegram.SendMessage(ctx, token, settings.TelegramChatID, text)
+	if err := s.telegram.SendMessage(ctx, token, settings.TelegramChatID, text); err != nil {
+		return fmt.Errorf("telegram: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) RunCheck(ctx context.Context) error {
@@ -176,6 +174,38 @@ func (s *Service) loadTelegramConfig(ctx context.Context) (db.NotificationSettin
 		return row, "", fmt.Errorf("decrypt telegram token: %w", err)
 	}
 	return row, token, nil
+}
+
+func (s *Service) getSettingsRow(ctx context.Context) (db.NotificationSettings, error) {
+	row, err := s.queries.GetNotificationSettings(ctx)
+	if err == nil {
+		return row, nil
+	}
+	if mapped := mapDBErr(err); mapped != nil {
+		return db.NotificationSettings{}, mapped
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return db.NotificationSettings{}, err
+	}
+	row, err = s.queries.EnsureNotificationSettings(ctx)
+	if err != nil {
+		if mapped := mapDBErr(err); mapped != nil {
+			return db.NotificationSettings{}, mapped
+		}
+		return db.NotificationSettings{}, err
+	}
+	return row, nil
+}
+
+func mapDBErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "42P01" {
+		return fmt.Errorf("%w: apply migration 00006_notification_settings", ErrMigration)
+	}
+	return nil
 }
 
 func validateUpdate(req UpdateSettingsRequest, current db.NotificationSettings) error {
