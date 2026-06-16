@@ -13,6 +13,7 @@ export function Nav() {
       </Link>
       <div className="nav-links">
         <Link href="/sites">Sites</Link>
+        <Link href="/notifications">Уведомления</Link>
         <Link href="/sites/new">New site</Link>
         <button type="button" className="btn btn-secondary nav-logout" onClick={logout}>
           Log out

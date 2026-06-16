@@ -15,6 +15,7 @@ import (
 	"github.com/ebash/dock-pilot/backend/internal/docker"
 	"github.com/ebash/dock-pilot/backend/internal/healthcheck"
 	"github.com/ebash/dock-pilot/backend/internal/nginx"
+	"github.com/ebash/dock-pilot/backend/internal/notifications"
 	"github.com/ebash/dock-pilot/backend/internal/secrets"
 	"github.com/ebash/dock-pilot/backend/internal/sites"
 	"github.com/ebash/dock-pilot/backend/internal/ssl"
@@ -72,11 +73,17 @@ func main() {
 	healthChecker := healthcheck.NewChecker(dockerClient)
 	sitesSvc := sites.NewService(pool, queries, healthChecker, dockerClient)
 	secretsSvc := secrets.NewService(queries, cipher)
+	notifSvc := notifications.NewService(queries, cipher, sitesSvc)
 	worker := deployments.NewWorker(queries, dockerClient, nginxMgr, sslMgr, secretsSvc, cfg.Deploy.WorkDir, logger)
 	deploySvc := deployments.NewService(queries, worker)
+	notifWorker := notifications.NewWorker(notifSvc, logger)
+
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	notifWorker.Start(workerCtx)
 
 	logger.Info("cors allowed origins", "origins", cfg.CORSAllowedOrigins)
-	handler := api.Mount(logger, cfg.APIToken, cfg.CORSAllowedOrigins, sitesSvc, secretsSvc, deploySvc)
+	handler := api.Mount(logger, cfg.APIToken, cfg.CORSAllowedOrigins, sitesSvc, secretsSvc, deploySvc, notifSvc)
 	server := &http.Server{
 		Addr:         cfg.HTTPAddr,
 		Handler:      handler,
@@ -96,6 +103,8 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
+
+	workerCancel()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

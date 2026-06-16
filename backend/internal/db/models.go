@@ -29,26 +29,39 @@ type DeploymentLog struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+type NotificationSetting struct {
+	ID                        int32              `json:"id"`
+	Enabled                   bool               `json:"enabled"`
+	TelegramChatID            string             `json:"telegram_chat_id"`
+	DailyDigestEnabled        bool               `json:"daily_digest_enabled"`
+	DailyDigestHour           int32              `json:"daily_digest_hour"`
+	AlertOnIncidentEnabled    bool               `json:"alert_on_incident_enabled"`
+	EncryptedTelegramBotToken []byte             `json:"encrypted_telegram_bot_token"`
+	LastDailySentAt           pgtype.Timestamptz `json:"last_daily_sent_at"`
+	LastOverallBySite         []byte             `json:"last_overall_by_site"`
+	UpdatedAt                 time.Time          `json:"updated_at"`
+}
+
 type Site struct {
-	ID              uuid.UUID   `json:"id"`
-	Name            string      `json:"name"`
-	Slug            string      `json:"slug"`
-	PrimaryUrl      string      `json:"primary_url"`
-	GitRepoUrl      string      `json:"git_repo_url"`
-	GitBranch       string      `json:"git_branch"`
-	DockerfilePath  string      `json:"dockerfile_path"`
-	BuildContext    string      `json:"build_context"`
-	ContainerPort   int32       `json:"container_port"`
-	HostPort        pgtype.Int4 `json:"host_port"`
-	NginxSslEnabled bool        `json:"nginx_ssl_enabled"`
-	NginxForceHttps bool        `json:"nginx_force_https"`
-	SiteType            string `json:"site_type"`
-	DockerVolumeMounts  string `json:"docker_volume_mounts"`
-	DockerNamedVolumes  string `json:"docker_named_volumes"`
-	DockerNetworkHost   bool   `json:"docker_network_host"`
-	Status              string `json:"status"`
-	CreatedAt       time.Time   `json:"created_at"`
-	UpdatedAt       time.Time   `json:"updated_at"`
+	ID                 uuid.UUID   `json:"id"`
+	Name               string      `json:"name"`
+	Slug               string      `json:"slug"`
+	PrimaryUrl         string      `json:"primary_url"`
+	GitRepoUrl         string      `json:"git_repo_url"`
+	GitBranch          string      `json:"git_branch"`
+	DockerfilePath     string      `json:"dockerfile_path"`
+	BuildContext       string      `json:"build_context"`
+	ContainerPort      int32       `json:"container_port"`
+	HostPort           pgtype.Int4 `json:"host_port"`
+	NginxSslEnabled    bool        `json:"nginx_ssl_enabled"`
+	NginxForceHttps    bool        `json:"nginx_force_https"`
+	SiteType           string      `json:"site_type"`
+	DockerVolumeMounts string      `json:"docker_volume_mounts"`
+	DockerNamedVolumes string      `json:"docker_named_volumes"`
+	DockerNetworkHost  bool        `json:"docker_network_host"`
+	Status             string      `json:"status"`
+	CreatedAt          time.Time   `json:"created_at"`
+	UpdatedAt          time.Time   `json:"updated_at"`
 }
 
 type SiteDomain struct {
@@ -75,4 +88,17 @@ type SiteSecret struct {
 	EncryptedValue []byte    `json:"encrypted_value"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type NotificationSettings struct {
+	ID                         int32              `json:"id"`
+	Enabled                    bool               `json:"enabled"`
+	TelegramChatID             string             `json:"telegram_chat_id"`
+	DailyDigestEnabled         bool               `json:"daily_digest_enabled"`
+	DailyDigestHour            int32              `json:"daily_digest_hour"`
+	AlertOnIncidentEnabled     bool               `json:"alert_on_incident_enabled"`
+	EncryptedTelegramBotToken  []byte             `json:"encrypted_telegram_bot_token"`
+	LastDailySentAt            pgtype.Timestamptz `json:"last_daily_sent_at"`
+	LastOverallBySite          []byte             `json:"last_overall_by_site"`
+	UpdatedAt                  time.Time          `json:"updated_at"`
 }

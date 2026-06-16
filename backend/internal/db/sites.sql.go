@@ -12,8 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const siteColumns = `id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at`
-
 const createSite = `-- name: CreateSite :one
 INSERT INTO sites (
     name, slug, primary_url, git_repo_url, git_branch,
@@ -22,30 +20,47 @@ INSERT INTO sites (
     docker_volume_mounts, docker_named_volumes, docker_network_host, status
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
-) RETURNING ` + siteColumns
+) RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at
+`
 
 type CreateSiteParams struct {
-	Name            string      `json:"name"`
-	Slug            string      `json:"slug"`
-	PrimaryUrl      string      `json:"primary_url"`
-	GitRepoUrl      string      `json:"git_repo_url"`
-	GitBranch       string      `json:"git_branch"`
-	DockerfilePath  string      `json:"dockerfile_path"`
-	BuildContext    string      `json:"build_context"`
-	ContainerPort   int32       `json:"container_port"`
-	HostPort        pgtype.Int4 `json:"host_port"`
-	NginxSslEnabled bool        `json:"nginx_ssl_enabled"`
-	NginxForceHttps bool        `json:"nginx_force_https"`
-	SiteType           string `json:"site_type"`
-	DockerVolumeMounts string `json:"docker_volume_mounts"`
+	Name               string      `json:"name"`
+	Slug               string      `json:"slug"`
+	PrimaryUrl         string      `json:"primary_url"`
+	GitRepoUrl         string      `json:"git_repo_url"`
+	GitBranch          string      `json:"git_branch"`
+	DockerfilePath     string      `json:"dockerfile_path"`
+	BuildContext       string      `json:"build_context"`
+	ContainerPort      int32       `json:"container_port"`
+	HostPort           pgtype.Int4 `json:"host_port"`
+	NginxSslEnabled    bool        `json:"nginx_ssl_enabled"`
+	NginxForceHttps    bool        `json:"nginx_force_https"`
+	SiteType           string      `json:"site_type"`
+	DockerVolumeMounts string      `json:"docker_volume_mounts"`
 	DockerNamedVolumes string      `json:"docker_named_volumes"`
 	DockerNetworkHost  bool        `json:"docker_network_host"`
 	Status             string      `json:"status"`
 }
 
-func scanSite(row interface {
-	Scan(dest ...any) error
-}) (Site, error) {
+func (q *Queries) CreateSite(ctx context.Context, arg CreateSiteParams) (Site, error) {
+	row := q.db.QueryRow(ctx, createSite,
+		arg.Name,
+		arg.Slug,
+		arg.PrimaryUrl,
+		arg.GitRepoUrl,
+		arg.GitBranch,
+		arg.DockerfilePath,
+		arg.BuildContext,
+		arg.ContainerPort,
+		arg.HostPort,
+		arg.NginxSslEnabled,
+		arg.NginxForceHttps,
+		arg.SiteType,
+		arg.DockerVolumeMounts,
+		arg.DockerNamedVolumes,
+		arg.DockerNetworkHost,
+		arg.Status,
+	)
 	var i Site
 	err := row.Scan(
 		&i.ID,
@@ -71,28 +86,6 @@ func scanSite(row interface {
 	return i, err
 }
 
-func (q *Queries) CreateSite(ctx context.Context, arg CreateSiteParams) (Site, error) {
-	row := q.db.QueryRow(ctx, createSite,
-		arg.Name,
-		arg.Slug,
-		arg.PrimaryUrl,
-		arg.GitRepoUrl,
-		arg.GitBranch,
-		arg.DockerfilePath,
-		arg.BuildContext,
-		arg.ContainerPort,
-		arg.HostPort,
-		arg.NginxSslEnabled,
-		arg.NginxForceHttps,
-		arg.SiteType,
-		arg.DockerVolumeMounts,
-		arg.DockerNamedVolumes,
-		arg.DockerNetworkHost,
-		arg.Status,
-	)
-	return scanSite(row)
-}
-
 const deleteSite = `-- name: DeleteSite :exec
 DELETE FROM sites WHERE id = $1
 `
@@ -103,25 +96,69 @@ func (q *Queries) DeleteSite(ctx context.Context, id uuid.UUID) error {
 }
 
 const getSite = `-- name: GetSite :one
-SELECT ` + siteColumns + ` FROM sites WHERE id = $1
+SELECT id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at FROM sites WHERE id = $1
 `
 
 func (q *Queries) GetSite(ctx context.Context, id uuid.UUID) (Site, error) {
 	row := q.db.QueryRow(ctx, getSite, id)
-	return scanSite(row)
+	var i Site
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.PrimaryUrl,
+		&i.GitRepoUrl,
+		&i.GitBranch,
+		&i.DockerfilePath,
+		&i.BuildContext,
+		&i.ContainerPort,
+		&i.HostPort,
+		&i.NginxSslEnabled,
+		&i.NginxForceHttps,
+		&i.SiteType,
+		&i.DockerVolumeMounts,
+		&i.DockerNamedVolumes,
+		&i.DockerNetworkHost,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getSiteBySlug = `-- name: GetSiteBySlug :one
-SELECT ` + siteColumns + ` FROM sites WHERE slug = $1
+SELECT id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at FROM sites WHERE slug = $1
 `
 
 func (q *Queries) GetSiteBySlug(ctx context.Context, slug string) (Site, error) {
 	row := q.db.QueryRow(ctx, getSiteBySlug, slug)
-	return scanSite(row)
+	var i Site
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.PrimaryUrl,
+		&i.GitRepoUrl,
+		&i.GitBranch,
+		&i.DockerfilePath,
+		&i.BuildContext,
+		&i.ContainerPort,
+		&i.HostPort,
+		&i.NginxSslEnabled,
+		&i.NginxForceHttps,
+		&i.SiteType,
+		&i.DockerVolumeMounts,
+		&i.DockerNamedVolumes,
+		&i.DockerNetworkHost,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const listSites = `-- name: ListSites :many
-SELECT ` + siteColumns + ` FROM sites ORDER BY created_at DESC
+SELECT id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at FROM sites ORDER BY created_at DESC
 `
 
 func (q *Queries) ListSites(ctx context.Context) ([]Site, error) {
@@ -132,8 +169,28 @@ func (q *Queries) ListSites(ctx context.Context) ([]Site, error) {
 	defer rows.Close()
 	items := []Site{}
 	for rows.Next() {
-		i, err := scanSite(rows)
-		if err != nil {
+		var i Site
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.PrimaryUrl,
+			&i.GitRepoUrl,
+			&i.GitBranch,
+			&i.DockerfilePath,
+			&i.BuildContext,
+			&i.ContainerPort,
+			&i.HostPort,
+			&i.NginxSslEnabled,
+			&i.NginxForceHttps,
+			&i.SiteType,
+			&i.DockerVolumeMounts,
+			&i.DockerNamedVolumes,
+			&i.DockerNetworkHost,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -163,19 +220,20 @@ UPDATE sites SET
     status = COALESCE($15, status),
     updated_at = now()
 WHERE id = $16
-RETURNING ` + siteColumns
+RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at
+`
 
 type UpdateSiteParams struct {
-	Name            pgtype.Text `json:"name"`
-	PrimaryUrl      pgtype.Text `json:"primary_url"`
-	GitRepoUrl      pgtype.Text `json:"git_repo_url"`
-	GitBranch       pgtype.Text `json:"git_branch"`
-	DockerfilePath  pgtype.Text `json:"dockerfile_path"`
-	BuildContext    pgtype.Text `json:"build_context"`
-	ContainerPort   pgtype.Int4 `json:"container_port"`
-	HostPort        pgtype.Int4 `json:"host_port"`
-	NginxSslEnabled pgtype.Bool `json:"nginx_ssl_enabled"`
-	NginxForceHttps pgtype.Bool `json:"nginx_force_https"`
+	Name               pgtype.Text `json:"name"`
+	PrimaryUrl         pgtype.Text `json:"primary_url"`
+	GitRepoUrl         pgtype.Text `json:"git_repo_url"`
+	GitBranch          pgtype.Text `json:"git_branch"`
+	DockerfilePath     pgtype.Text `json:"dockerfile_path"`
+	BuildContext       pgtype.Text `json:"build_context"`
+	ContainerPort      pgtype.Int4 `json:"container_port"`
+	HostPort           pgtype.Int4 `json:"host_port"`
+	NginxSslEnabled    pgtype.Bool `json:"nginx_ssl_enabled"`
+	NginxForceHttps    pgtype.Bool `json:"nginx_force_https"`
 	SiteType           pgtype.Text `json:"site_type"`
 	DockerVolumeMounts pgtype.Text `json:"docker_volume_mounts"`
 	DockerNamedVolumes pgtype.Text `json:"docker_named_volumes"`
@@ -203,11 +261,34 @@ func (q *Queries) UpdateSite(ctx context.Context, arg UpdateSiteParams) (Site, e
 		arg.Status,
 		arg.ID,
 	)
-	return scanSite(row)
+	var i Site
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.PrimaryUrl,
+		&i.GitRepoUrl,
+		&i.GitBranch,
+		&i.DockerfilePath,
+		&i.BuildContext,
+		&i.ContainerPort,
+		&i.HostPort,
+		&i.NginxSslEnabled,
+		&i.NginxForceHttps,
+		&i.SiteType,
+		&i.DockerVolumeMounts,
+		&i.DockerNamedVolumes,
+		&i.DockerNetworkHost,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const updateSiteHostPort = `-- name: UpdateSiteHostPort :one
-UPDATE sites SET host_port = $2, updated_at = now() WHERE id = $1 RETURNING ` + siteColumns
+UPDATE sites SET host_port = $2, updated_at = now() WHERE id = $1 RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at
+`
 
 type UpdateSiteHostPortParams struct {
 	ID       uuid.UUID   `json:"id"`
@@ -216,11 +297,34 @@ type UpdateSiteHostPortParams struct {
 
 func (q *Queries) UpdateSiteHostPort(ctx context.Context, arg UpdateSiteHostPortParams) (Site, error) {
 	row := q.db.QueryRow(ctx, updateSiteHostPort, arg.ID, arg.HostPort)
-	return scanSite(row)
+	var i Site
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.PrimaryUrl,
+		&i.GitRepoUrl,
+		&i.GitBranch,
+		&i.DockerfilePath,
+		&i.BuildContext,
+		&i.ContainerPort,
+		&i.HostPort,
+		&i.NginxSslEnabled,
+		&i.NginxForceHttps,
+		&i.SiteType,
+		&i.DockerVolumeMounts,
+		&i.DockerNamedVolumes,
+		&i.DockerNetworkHost,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const updateSiteStatus = `-- name: UpdateSiteStatus :one
-UPDATE sites SET status = $2, updated_at = now() WHERE id = $1 RETURNING ` + siteColumns
+UPDATE sites SET status = $2, updated_at = now() WHERE id = $1 RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at
+`
 
 type UpdateSiteStatusParams struct {
 	ID     uuid.UUID `json:"id"`
@@ -229,5 +333,27 @@ type UpdateSiteStatusParams struct {
 
 func (q *Queries) UpdateSiteStatus(ctx context.Context, arg UpdateSiteStatusParams) (Site, error) {
 	row := q.db.QueryRow(ctx, updateSiteStatus, arg.ID, arg.Status)
-	return scanSite(row)
+	var i Site
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.PrimaryUrl,
+		&i.GitRepoUrl,
+		&i.GitBranch,
+		&i.DockerfilePath,
+		&i.BuildContext,
+		&i.ContainerPort,
+		&i.HostPort,
+		&i.NginxSslEnabled,
+		&i.NginxForceHttps,
+		&i.SiteType,
+		&i.DockerVolumeMounts,
+		&i.DockerNamedVolumes,
+		&i.DockerNetworkHost,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

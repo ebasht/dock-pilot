@@ -7,10 +7,12 @@ import { normalizeSecretMeta, normalizeSite } from "./normalize";
 import type {
   CreateSiteRequest,
   Deployment,
+  NotificationSettings,
   SecretMeta,
   Site,
   SiteHealth,
   SiteListItem,
+  UpdateNotificationSettings,
 } from "./types";
 
 import { resolveApiBase } from "./api-base";
@@ -178,4 +180,16 @@ export const api = {
     new EventSource(
       streamURL(`/api/deployments/${deploymentId}/logs/stream`),
     ),
+
+  getNotificationSettings: () =>
+    request<NotificationSettings>("/api/notifications/settings"),
+
+  updateNotificationSettings: (body: UpdateNotificationSettings) =>
+    request<NotificationSettings>("/api/notifications/settings", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  sendNotificationTest: () =>
+    request<{ status: string }>("/api/notifications/test", { method: "POST" }),
 };

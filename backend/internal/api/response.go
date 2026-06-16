@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	deploysvc "github.com/ebash/dock-pilot/backend/internal/deployments"
+	notifpkg "github.com/ebash/dock-pilot/backend/internal/notifications"
 	secretpkg "github.com/ebash/dock-pilot/backend/internal/secrets"
 	sitesvc "github.com/ebash/dock-pilot/backend/internal/sites"
 )
@@ -27,14 +28,17 @@ func writeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, sitesvc.ErrNotFound),
 		errors.Is(err, deploysvc.ErrNotFound),
-		errors.Is(err, secretpkg.ErrNotFound):
+		errors.Is(err, secretpkg.ErrNotFound),
+		errors.Is(err, notifpkg.ErrNotFound):
 		status = http.StatusNotFound
 		msg = err.Error()
 	case errors.Is(err, sitesvc.ErrSlugConflict):
 		status = http.StatusConflict
 		msg = err.Error()
 	case errors.Is(err, sitesvc.ErrInvalidInput),
-		errors.Is(err, secretpkg.ErrInvalidInput):
+		errors.Is(err, secretpkg.ErrInvalidInput),
+		errors.Is(err, notifpkg.ErrInvalidInput),
+		errors.Is(err, notifpkg.ErrNotConfigured):
 		status = http.StatusBadRequest
 		msg = err.Error()
 	}

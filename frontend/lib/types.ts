@@ -40,6 +40,25 @@ export interface SiteHealth {
   checked_at: string;
 }
 
+export interface NotificationSettings {
+  enabled: boolean;
+  telegram_chat_id: string;
+  telegram_bot_token_set: boolean;
+  daily_digest_enabled: boolean;
+  daily_digest_hour: number;
+  alert_on_incident_enabled: boolean;
+}
+
+export interface UpdateNotificationSettings {
+  enabled: boolean;
+  telegram_chat_id: string;
+  telegram_bot_token?: string;
+  clear_telegram_bot_token?: boolean;
+  daily_digest_enabled: boolean;
+  daily_digest_hour: number;
+  alert_on_incident_enabled: boolean;
+}
+
 export interface Domain {
   id?: string;
   domain: string;

@@ -1,0 +1,227 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { api, ApiError } from "@/lib/api";
+import type { NotificationSettings, UpdateNotificationSettings } from "@/lib/types";
+
+export default function NotificationsPage() {
+  const [settings, setSettings] = useState<NotificationSettings | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testOk, setTestOk] = useState(false);
+
+  const [enabled, setEnabled] = useState(false);
+  const [telegramChatID, setTelegramChatID] = useState("");
+  const [telegramBotToken, setTelegramBotToken] = useState("");
+  const [tokenSet, setTokenSet] = useState(false);
+  const [clearToken, setClearToken] = useState(false);
+  const [dailyDigestEnabled, setDailyDigestEnabled] = useState(false);
+  const [dailyDigestHour, setDailyDigestHour] = useState(9);
+  const [alertOnIncident, setAlertOnIncident] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const s = await api.getNotificationSettings();
+      setSettings(s);
+      setEnabled(s.enabled);
+      setTelegramChatID(s.telegram_chat_id);
+      setTokenSet(s.telegram_bot_token_set);
+      setDailyDigestEnabled(s.daily_digest_enabled);
+      setDailyDigestHour(s.daily_digest_hour);
+      setAlertOnIncident(s.alert_on_incident_enabled);
+      setTelegramBotToken("");
+      setClearToken(false);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Не удалось загрузить настройки");
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const buildPayload = (): UpdateNotificationSettings => ({
+    enabled,
+    telegram_chat_id: telegramChatID.trim(),
+    daily_digest_enabled: dailyDigestEnabled,
+    daily_digest_hour: dailyDigestHour,
+    alert_on_incident_enabled: alertOnIncident,
+    ...(telegramBotToken.trim()
+      ? { telegram_bot_token: telegramBotToken.trim() }
+      : {}),
+    ...(clearToken ? { clear_telegram_bot_token: true } : {}),
+  });
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSaved(false);
+    setError(null);
+    try {
+      const updated = await api.updateNotificationSettings(buildPayload());
+      setSettings(updated);
+      setTokenSet(updated.telegram_bot_token_set);
+      setTelegramBotToken("");
+      setClearToken(false);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось сохранить");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestOk(false);
+    setError(null);
+    try {
+      if (
+        settings &&
+        (telegramBotToken.trim() ||
+          telegramChatID.trim() !== settings.telegram_chat_id ||
+          enabled !== settings.enabled)
+      ) {
+        await api.updateNotificationSettings(buildPayload());
+        await load();
+      }
+      await api.sendNotificationTest();
+      setTestOk(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Тест не удался");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div>
+      <h1>Уведомления</h1>
+      <p style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
+        Отправка статуса всех сайтов в Telegram: ежедневный отчёт и оповещение при
+        аварии (контейнер остановлен, healthcheck или HTTP не отвечает).
+      </p>
+
+      {error && <div className="alert alert-error">{error}</div>}
+      {saved && <div className="alert alert-success">Сохранено</div>}
+      {testOk && (
+        <div className="alert alert-success">Тестовое сообщение отправлено в Telegram</div>
+      )}
+
+      <form onSubmit={handleSave} className="card" style={{ marginTop: "1rem" }}>
+        <div className="field">
+          <label className="label checkbox-row">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => setEnabled(e.target.checked)}
+            />
+            <span>Включить уведомления в Telegram</span>
+          </label>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="telegram-token">
+            Токен бота Telegram
+          </label>
+          <input
+            id="telegram-token"
+            className="input"
+            type="password"
+            autoComplete="off"
+            placeholder={tokenSet ? "Уже сохранён — введите новый, чтобы заменить" : "123456:ABC..."}
+            value={telegramBotToken}
+            onChange={(e) => setTelegramBotToken(e.target.value)}
+          />
+          {tokenSet && (
+            <label className="label checkbox-row" style={{ marginTop: "0.5rem" }}>
+              <input
+                type="checkbox"
+                checked={clearToken}
+                onChange={(e) => setClearToken(e.target.checked)}
+              />
+              <span>Удалить сохранённый токен</span>
+            </label>
+          )}
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="telegram-chat">
+            Chat ID
+          </label>
+          <input
+            id="telegram-chat"
+            className="input"
+            type="text"
+            placeholder="-1001234567890"
+            value={telegramChatID}
+            onChange={(e) => setTelegramChatID(e.target.value)}
+          />
+          <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
+            ID чата или канала. Узнать можно через @userinfobot или @getidsbot.
+          </p>
+        </div>
+
+        <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "1.25rem 0" }} />
+
+        <div className="field">
+          <label className="label checkbox-row">
+            <input
+              type="checkbox"
+              checked={dailyDigestEnabled}
+              onChange={(e) => setDailyDigestEnabled(e.target.checked)}
+            />
+            <span>Ежедневный отчёт о состоянии всех сервисов</span>
+          </label>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="digest-hour">
+            Время отчёта (UTC)
+          </label>
+          <select
+            id="digest-hour"
+            className="input"
+            value={dailyDigestHour}
+            onChange={(e) => setDailyDigestHour(Number(e.target.value))}
+            disabled={!dailyDigestEnabled}
+          >
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={h}>
+                {String(h).padStart(2, "0")}:00 UTC
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label className="label checkbox-row">
+            <input
+              type="checkbox"
+              checked={alertOnIncident}
+              onChange={(e) => setAlertOnIncident(e.target.checked)}
+            />
+            <span>Оповещать при аварии (статус unhealthy или degraded)</span>
+          </label>
+        </div>
+
+        <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", flexWrap: "wrap" }}>
+          <button type="submit" className="btn" disabled={saving}>
+            {saving ? "Сохранение…" : "Сохранить"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={testing || !enabled}
+            onClick={handleTest}
+          >
+            {testing ? "Отправка…" : "Отправить тест"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

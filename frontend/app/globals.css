@@ -280,6 +280,23 @@ h3 {
   color: #fecaca;
 }
 
+.alert-success {
+  background: #14532d;
+  border: 1px solid #166534;
+  color: #86efac;
+}
+
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;

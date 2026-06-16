@@ -9,14 +9,16 @@ import (
 	"github.com/go-chi/cors"
 
 	deploysvc "github.com/ebash/dock-pilot/backend/internal/deployments"
+	notifpkg "github.com/ebash/dock-pilot/backend/internal/notifications"
 	secretpkg "github.com/ebash/dock-pilot/backend/internal/secrets"
 	sitesvc "github.com/ebash/dock-pilot/backend/internal/sites"
 )
 
 type Handlers struct {
-	Sites       *SitesHandler
-	Secrets     *SecretsHandler
-	Deployments *DeploymentsHandler
+	Sites         *SitesHandler
+	Secrets       *SecretsHandler
+	Deployments   *DeploymentsHandler
+	Notifications *NotificationsHandler
 }
 
 func NewRouter(h Handlers, apiToken string, corsOrigins []string) http.Handler {
@@ -66,17 +68,24 @@ func NewRouter(h Handlers, apiToken string, corsOrigins []string) http.Handler {
 			})
 		})
 
+		r.Route("/notifications", func(r chi.Router) {
+			r.Get("/settings", h.Notifications.GetSettings)
+			r.Put("/settings", h.Notifications.UpdateSettings)
+			r.Post("/test", h.Notifications.SendTest)
+		})
+
 		r.Get("/deployments/{id}/logs/stream", h.Deployments.StreamLogs)
 	})
 
 	return r
 }
 
-func Mount(logger *slog.Logger, apiToken string, corsOrigins []string, sites *sitesvc.Service, secrets *secretpkg.Service, deployments *deploysvc.Service) http.Handler {
+func Mount(logger *slog.Logger, apiToken string, corsOrigins []string, sites *sitesvc.Service, secrets *secretpkg.Service, deployments *deploysvc.Service, notifications *notifpkg.Service) http.Handler {
 	_ = logger
 	return NewRouter(Handlers{
-		Sites:       NewSitesHandler(sites),
-		Secrets:     NewSecretsHandler(secrets),
-		Deployments: NewDeploymentsHandler(deployments),
+		Sites:         NewSitesHandler(sites),
+		Secrets:       NewSecretsHandler(secrets),
+		Deployments:   NewDeploymentsHandler(deployments),
+		Notifications: NewNotificationsHandler(notifications),
 	}, apiToken, corsOrigins)
 }
