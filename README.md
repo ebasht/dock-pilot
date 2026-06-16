@@ -115,6 +115,38 @@ sudo bash /tmp/dock-pilot-install.sh \
 
 Если на сервере уже стоят Docker, nginx и certbot, но `apt` ругается на конфликты пакетов — используйте `--skip-packages`.
 
+### Обновление на VPS (новые образы)
+
+Повторный `install.sh` **не подтягивает новые образы**, если в `/opt/dock-pilot` уже есть `docker-compose.full.yml` и теги `dock-pilot-*:latest`. Используйте скрипт обновления:
+
+```bash
+curl -fsSL -H "Accept: application/vnd.github.raw+json" \
+  "https://api.github.com/repos/e-bashtan/dock-pilot/contents/scripts/dock-pilot-upgrade.sh?ref=main" \
+  -o /tmp/dock-pilot-upgrade.sh
+
+sudo bash /tmp/dock-pilot-upgrade.sh v0.1.7
+# или последний релиз:
+sudo bash /tmp/dock-pilot-upgrade.sh latest
+```
+
+Скрипт: скачивает release с GitHub → `docker load` → миграции → `up -d --force-recreate api frontend` → обновляет nginx.
+
+Вручную (то же самое):
+
+```bash
+cd /opt/dock-pilot
+VERSION=v0.1.7
+curl -fsSL -o /tmp/bundle.tar.gz \
+  "https://github.com/e-bashtan/dock-pilot/releases/download/${VERSION}/dock-pilot-${VERSION#v}.tar.gz"
+tar -xzf /tmp/bundle.tar.gz -C /tmp
+gunzip -c /tmp/dock-pilot-images.tar.gz | docker load
+docker compose -f docker-compose.full.yml run --rm -T migrate
+docker compose -f docker-compose.full.yml up -d --force-recreate api frontend
+sudo bash scripts/configure-panel-nginx.sh
+```
+
+Проверка: в шапке панели должна появиться версия (`v0.1.7`). API-токен и данные БД сохраняются (`.env` и volume не трогаются).
+
 Дальше в панели создайте сайт с **вашим доменом приложения** (DNS → тот же VPS) и нажмите Deploy — certbot выдаст сертификат для сайта автоматически.
 
 ### Сборка релиза (maintainer)
