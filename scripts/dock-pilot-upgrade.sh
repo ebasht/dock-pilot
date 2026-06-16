@@ -62,8 +62,9 @@ set +e
 docker compose -f "$COMPOSE" run --rm -T migrate
 set -e
 
-log "Recreating api + frontend (picks up new images)..."
-docker compose -f "$COMPOSE" up -d --force-recreate api frontend
+log "Recreating postgres + api + frontend (picks up new images and compose)..."
+docker rm -f dock-pilot-telegram-socks-relay 2>/dev/null || true
+docker compose -f "$COMPOSE" up -d --force-recreate postgres api frontend
 
 if [[ -x "${ROOT}/scripts/configure-panel-nginx.sh" ]]; then
   log "Refreshing nginx panel config..."
