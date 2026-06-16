@@ -6,22 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 )
 
-type TelegramClient struct {
-	http *http.Client
-}
-
-func NewTelegramClient() *TelegramClient {
-	return &TelegramClient{
-		http: &http.Client{Timeout: 15 * time.Second},
-	}
-}
-
-func (t *TelegramClient) SendMessage(ctx context.Context, botToken, chatID, text string) error {
+func (t *TelegramClient) SendMessage(ctx context.Context, botToken, chatID, text, proxyURL string) error {
 	botToken = strings.TrimSpace(botToken)
 	chatID = strings.TrimSpace(chatID)
 	if botToken == "" || chatID == "" {
@@ -44,9 +37,14 @@ func (t *TelegramClient) SendMessage(ctx context.Context, botToken, chatID, text
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := t.http.Do(req)
+	client := httpClientFor(proxyURL)
+	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		if strings.Contains(err.Error(), "context deadline exceeded") ||
+			strings.Contains(err.Error(), "Client.Timeout") {
+			return fmt.Errorf("telegram: timeout reaching api.telegram.org — check HTTP proxy settings: %w", err)
+		}
+		return fmt.Errorf("telegram: %w", err)
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
@@ -68,7 +66,58 @@ func (t *TelegramClient) SendMessage(ctx context.Context, botToken, chatID, text
 	return nil
 }
 
+type TelegramClient struct{}
+
+func NewTelegramClient() *TelegramClient {
+	return &TelegramClient{}
+}
+
+func httpClientFor(proxyURL string) *http.Client {
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+	for _, candidate := range []string{proxyURL, telegramProxyFromEnv()} {
+		if u, err := url.Parse(strings.TrimSpace(candidate)); err == nil && u.Scheme != "" && u.Host != "" {
+			transport.Proxy = http.ProxyURL(u)
+			break
+		}
+	}
+	return &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: transport,
+	}
+}
+
+func telegramProxyFromEnv() string {
+	if v := strings.TrimSpace(os.Getenv("TELEGRAM_HTTP_PROXY")); v != "" {
+		return v
+	}
+	return strings.TrimSpace(os.Getenv("HTTPS_PROXY"))
+}
+
 func escapeHTML(s string) string {
 	replacer := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
 	return replacer.Replace(s)
+}
+
+func validateProxyURL(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return fmt.Errorf("%w: telegram_http_proxy must be a URL like http://host:3128", ErrInvalidInput)
+	}
+	switch u.Scheme {
+	case "http", "https":
+		return nil
+	default:
+		return fmt.Errorf("%w: telegram_http_proxy scheme must be http or https", ErrInvalidInput)
+	}
 }

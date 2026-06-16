@@ -69,6 +69,7 @@ func (s *Service) UpdateSettings(ctx context.Context, req UpdateSettingsRequest)
 	row, err := s.queries.UpdateNotificationSettings(ctx, db.UpdateNotificationSettingsParams{
 		Enabled:                req.Enabled,
 		TelegramChatID:         strings.TrimSpace(req.TelegramChatID),
+		TelegramHttpProxy:      strings.TrimSpace(req.TelegramHTTPProxy),
 		DailyDigestEnabled:     req.DailyDigestEnabled,
 		DailyDigestHour:        int32(req.DailyDigestHour),
 		AlertOnIncidentEnabled: req.AlertOnIncidentEnabled,
@@ -85,7 +86,7 @@ func (s *Service) SendTest(ctx context.Context) error {
 		return err
 	}
 	text := "<b>DockPilot</b>\nТестовое уведомление — Telegram настроен."
-	if err := s.telegram.SendMessage(ctx, token, settings.TelegramChatID, text); err != nil {
+	if err := s.telegram.SendMessage(ctx, token, settings.TelegramChatID, text, settings.TelegramHttpProxy); err != nil {
 		return fmt.Errorf("telegram: %w", err)
 	}
 	return nil
@@ -119,7 +120,7 @@ func (s *Service) RunCheck(ctx context.Context) error {
 
 	if settings.DailyDigestEnabled && shouldSendDaily(settings.LastDailySentAt, settings.DailyDigestHour, now) {
 		msg := formatDailyDigest(healthRows, names, now)
-		if err := s.telegram.SendMessage(ctx, token, settings.TelegramChatID, msg); err != nil {
+		if err := s.telegram.SendMessage(ctx, token, settings.TelegramChatID, msg, settings.TelegramHttpProxy); err != nil {
 			return fmt.Errorf("daily digest: %w", err)
 		}
 		if err := s.queries.UpdateNotificationLastDailySent(ctx, pgtype.Timestamptz{Time: now, Valid: true}); err != nil {
@@ -137,7 +138,7 @@ func (s *Service) RunCheck(ctx context.Context) error {
 					name = sid
 				}
 				msg := formatIncident(name, h)
-				if err := s.telegram.SendMessage(ctx, token, settings.TelegramChatID, msg); err != nil {
+				if err := s.telegram.SendMessage(ctx, token, settings.TelegramChatID, msg, settings.TelegramHttpProxy); err != nil {
 					return fmt.Errorf("incident alert: %w", err)
 				}
 			}
@@ -209,6 +210,9 @@ func mapDBErr(err error) error {
 }
 
 func validateUpdate(req UpdateSettingsRequest, current db.NotificationSettings) error {
+	if err := validateProxyURL(req.TelegramHTTPProxy); err != nil {
+		return err
+	}
 	if req.DailyDigestHour < 0 || req.DailyDigestHour > 23 {
 		return ErrInvalidInput
 	}
@@ -232,6 +236,7 @@ func toSettingsResponse(row db.NotificationSettings) SettingsResponse {
 	return SettingsResponse{
 		Enabled:                row.Enabled,
 		TelegramChatID:         row.TelegramChatID,
+		TelegramHTTPProxy:      row.TelegramHttpProxy,
 		TelegramBotTokenSet:    len(row.EncryptedTelegramBotToken) > 0,
 		DailyDigestEnabled:     row.DailyDigestEnabled,
 		DailyDigestHour:        int(row.DailyDigestHour),

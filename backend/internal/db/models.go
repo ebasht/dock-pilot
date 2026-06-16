@@ -94,6 +94,7 @@ type NotificationSettings struct {
 	ID                         int32              `json:"id"`
 	Enabled                    bool               `json:"enabled"`
 	TelegramChatID             string             `json:"telegram_chat_id"`
+	TelegramHttpProxy          string             `json:"telegram_http_proxy"`
 	DailyDigestEnabled         bool               `json:"daily_digest_enabled"`
 	DailyDigestHour            int32              `json:"daily_digest_hour"`
 	AlertOnIncidentEnabled     bool               `json:"alert_on_incident_enabled"`

@@ -11,11 +11,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const notificationSettingsColumns = `id, enabled, telegram_chat_id, telegram_http_proxy, daily_digest_enabled, daily_digest_hour, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at`
+
 const ensureNotificationSettings = `-- name: EnsureNotificationSettings :one
 INSERT INTO notification_settings (id) VALUES (1)
 ON CONFLICT (id) DO UPDATE SET updated_at = notification_settings.updated_at
-RETURNING id, enabled, telegram_chat_id, daily_digest_enabled, daily_digest_hour, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at
-`
+RETURNING ` + notificationSettingsColumns
 
 func (q *Queries) EnsureNotificationSettings(ctx context.Context) (NotificationSettings, error) {
 	row := q.db.QueryRow(ctx, ensureNotificationSettings)
@@ -23,7 +24,7 @@ func (q *Queries) EnsureNotificationSettings(ctx context.Context) (NotificationS
 }
 
 const getNotificationSettings = `-- name: GetNotificationSettings :one
-SELECT id, enabled, telegram_chat_id, daily_digest_enabled, daily_digest_hour, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at FROM notification_settings WHERE id = 1
+SELECT ` + notificationSettingsColumns + ` FROM notification_settings WHERE id = 1
 `
 
 func scanNotificationSettings(row interface {
@@ -34,6 +35,7 @@ func scanNotificationSettings(row interface {
 		&i.ID,
 		&i.Enabled,
 		&i.TelegramChatID,
+		&i.TelegramHttpProxy,
 		&i.DailyDigestEnabled,
 		&i.DailyDigestHour,
 		&i.AlertOnIncidentEnabled,
@@ -54,17 +56,18 @@ const updateNotificationSettings = `-- name: UpdateNotificationSettings :one
 UPDATE notification_settings SET
     enabled = $1,
     telegram_chat_id = $2,
-    daily_digest_enabled = $3,
-    daily_digest_hour = $4,
-    alert_on_incident_enabled = $5,
+    telegram_http_proxy = $3,
+    daily_digest_enabled = $4,
+    daily_digest_hour = $5,
+    alert_on_incident_enabled = $6,
     updated_at = now()
 WHERE id = 1
-RETURNING id, enabled, telegram_chat_id, daily_digest_enabled, daily_digest_hour, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at
-`
+RETURNING ` + notificationSettingsColumns
 
 type UpdateNotificationSettingsParams struct {
 	Enabled                bool   `json:"enabled"`
 	TelegramChatID         string `json:"telegram_chat_id"`
+	TelegramHttpProxy      string `json:"telegram_http_proxy"`
 	DailyDigestEnabled     bool   `json:"daily_digest_enabled"`
 	DailyDigestHour        int32  `json:"daily_digest_hour"`
 	AlertOnIncidentEnabled bool   `json:"alert_on_incident_enabled"`
@@ -74,6 +77,7 @@ func (q *Queries) UpdateNotificationSettings(ctx context.Context, arg UpdateNoti
 	row := q.db.QueryRow(ctx, updateNotificationSettings,
 		arg.Enabled,
 		arg.TelegramChatID,
+		arg.TelegramHttpProxy,
 		arg.DailyDigestEnabled,
 		arg.DailyDigestHour,
 		arg.AlertOnIncidentEnabled,

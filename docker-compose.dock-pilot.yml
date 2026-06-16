@@ -55,6 +55,9 @@ services:
       NGINX_SITES_AVAILABLE: ${NGINX_SITES_AVAILABLE:-/host/etc/nginx/sites-available}
       NGINX_SITES_ENABLED: ${NGINX_SITES_ENABLED:-/host/etc/nginx/sites-enabled}
       CERTBOT_EMAIL: ${CERTBOT_EMAIL:?set CERTBOT_EMAIL}
+      TELEGRAM_HTTP_PROXY: ${TELEGRAM_HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     volumes:

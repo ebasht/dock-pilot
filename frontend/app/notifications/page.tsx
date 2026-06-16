@@ -14,6 +14,7 @@ export default function NotificationsPage() {
 
   const [enabled, setEnabled] = useState(false);
   const [telegramChatID, setTelegramChatID] = useState("");
+  const [telegramHTTPProxy, setTelegramHTTPProxy] = useState("");
   const [telegramBotToken, setTelegramBotToken] = useState("");
   const [tokenSet, setTokenSet] = useState(false);
   const [clearToken, setClearToken] = useState(false);
@@ -27,6 +28,7 @@ export default function NotificationsPage() {
       setSettings(s);
       setEnabled(s.enabled);
       setTelegramChatID(s.telegram_chat_id);
+      setTelegramHTTPProxy(s.telegram_http_proxy ?? "");
       setTokenSet(s.telegram_bot_token_set);
       setDailyDigestEnabled(s.daily_digest_enabled);
       setDailyDigestHour(s.daily_digest_hour);
@@ -46,6 +48,7 @@ export default function NotificationsPage() {
   const buildPayload = (): UpdateNotificationSettings => ({
     enabled,
     telegram_chat_id: telegramChatID.trim(),
+    telegram_http_proxy: telegramHTTPProxy.trim(),
     daily_digest_enabled: dailyDigestEnabled,
     daily_digest_hour: dailyDigestHour,
     alert_on_incident_enabled: alertOnIncident,
@@ -85,6 +88,7 @@ export default function NotificationsPage() {
         settings &&
         (telegramBotToken.trim() ||
           telegramChatID.trim() !== settings.telegram_chat_id ||
+          telegramHTTPProxy.trim() !== (settings.telegram_http_proxy ?? "") ||
           enabled !== settings.enabled ||
           dailyDigestEnabled !== settings.daily_digest_enabled ||
           dailyDigestHour !== settings.daily_digest_hour ||
@@ -168,6 +172,25 @@ export default function NotificationsPage() {
           />
           <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
             ID чата или канала. Узнать можно через @userinfobot или @getidsbot.
+          </p>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="telegram-proxy">
+            HTTP-прокси для Telegram API
+          </label>
+          <input
+            id="telegram-proxy"
+            className="input"
+            type="url"
+            autoComplete="off"
+            placeholder="http://user:pass@proxy-host:3128"
+            value={telegramHTTPProxy}
+            onChange={(e) => setTelegramHTTPProxy(e.target.value)}
+          />
+          <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
+            Нужен, если VPS не достучится до api.telegram.org (таймаут). Оставьте пустым,
+            если доступ есть напрямую. Поддерживаются http и https.
           </p>
         </div>
 
