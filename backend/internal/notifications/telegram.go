@@ -12,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"golang.org/x/net/proxy"
 )
 
 func (t *TelegramClient) SendMessage(ctx context.Context, botToken, chatID, text, proxyURL string) error {
@@ -73,23 +75,60 @@ func NewTelegramClient() *TelegramClient {
 }
 
 func httpClientFor(proxyURL string) *http.Client {
+	baseDialer := &net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   10 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
+		Proxy:       http.ProxyFromEnvironment,
+		DialContext: baseDialer.DialContext,
 		TLSHandshakeTimeout: 10 * time.Second,
 	}
 	for _, candidate := range []string{proxyURL, telegramProxyFromEnv()} {
-		if u, err := url.Parse(strings.TrimSpace(candidate)); err == nil && u.Scheme != "" && u.Host != "" {
-			transport.Proxy = http.ProxyURL(u)
+		if applyProxyToTransport(transport, baseDialer, candidate) {
 			break
 		}
 	}
 	return &http.Client{
 		Timeout:   30 * time.Second,
 		Transport: transport,
+	}
+}
+
+func applyProxyToTransport(transport *http.Transport, baseDialer *net.Dialer, raw string) bool {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return false
+	}
+	switch u.Scheme {
+	case "http", "https":
+		transport.Proxy = http.ProxyURL(u)
+		transport.DialContext = baseDialer.DialContext
+		return true
+	case "socks5":
+		var auth *proxy.Auth
+		if u.User != nil {
+			pass, _ := u.User.Password()
+			auth = &proxy.Auth{
+				User:     u.User.Username(),
+				Password: pass,
+			}
+		}
+		d, err := proxy.SOCKS5("tcp", u.Host, auth, baseDialer)
+		if err != nil {
+			return false
+		}
+		transport.Proxy = nil
+		if cd, ok := d.(proxy.ContextDialer); ok {
+			transport.DialContext = cd.DialContext
+		} else {
+			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return d.Dial(network, addr)
+			}
+		}
+		return true
+	default:
+		return false
 	}
 }
 
@@ -115,9 +154,9 @@ func validateProxyURL(raw string) error {
 		return fmt.Errorf("%w: telegram_http_proxy must be a URL like http://host:3128", ErrInvalidInput)
 	}
 	switch u.Scheme {
-	case "http", "https":
+	case "http", "https", "socks5":
 		return nil
 	default:
-		return fmt.Errorf("%w: telegram_http_proxy scheme must be http or https", ErrInvalidInput)
+		return fmt.Errorf("%w: telegram_http_proxy scheme must be http, https, or socks5", ErrInvalidInput)
 	}
 }

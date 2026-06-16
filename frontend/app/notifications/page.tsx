@@ -184,13 +184,13 @@ export default function NotificationsPage() {
             className="input"
             type="url"
             autoComplete="off"
-            placeholder="http://user:pass@proxy-host:3128"
+            placeholder="socks5://127.0.0.1:1080"
             value={telegramHTTPProxy}
             onChange={(e) => setTelegramHTTPProxy(e.target.value)}
           />
           <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
-            Нужен, если VPS не достучится до api.telegram.org (таймаут). Оставьте пустым,
-            если доступ есть напрямую. Поддерживаются http и https.
+            Нужен, если VPS не достучится до api.telegram.org (таймаут). Поддерживаются
+            socks5, http и https (например socks5://127.0.0.1:1080).
           </p>
         </div>
 
