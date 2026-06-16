@@ -1,11 +1,25 @@
-FROM golang:1.23-alpine
+# syntax=docker/dockerfile:1
+# Pre-built goose binary — avoids flaky proxy.golang.org during go install in CI.
 
-RUN apk add --no-cache git \
-    && go install github.com/pressly/goose/v3/cmd/goose@v3.24.2
+FROM alpine:3.21
+
+ARG GOOSE_VERSION=3.24.2
+ARG TARGETARCH=amd64
+
+RUN apk add --no-cache ca-certificates curl \
+    && case "${TARGETARCH}" in \
+         amd64) goose_arch="x86_64" ;; \
+         arm64) goose_arch="arm64" ;; \
+         *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL \
+         "https://github.com/pressly/goose/releases/download/v${GOOSE_VERSION}/goose_linux_${goose_arch}" \
+         -o /usr/local/bin/goose \
+    && chmod +x /usr/local/bin/goose \
+    && apk del curl
 
 ENV GOOSE_DRIVER=postgres
 
-# Migrations are baked into the image (no need to copy backend/migrations to VPS separately).
 COPY migrations /migrations
 
 WORKDIR /migrations
