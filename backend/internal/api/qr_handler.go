@@ -3,10 +3,13 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ebash/dock-pilot/backend/internal/auth"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type QRHandler struct {
@@ -33,6 +36,11 @@ type qrExchangeResponse struct {
 func (h *QRHandler) Create(w http.ResponseWriter, r *http.Request) {
 	code, expiresAt, err := h.qr.Create(r.Context())
 	if err != nil {
+		slog.Error("create qr session", "error", err)
+		if isMissingTable(err) {
+			writeJSON(w, http.StatusServiceUnavailable, errorBody{Error: "qr auth migration required"})
+			return
+		}
 		writeJSON(w, http.StatusInternalServerError, errorBody{Error: "failed to create qr session"})
 		return
 	}
@@ -63,4 +71,12 @@ func (h *QRHandler) Exchange(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, qrExchangeResponse{Token: token})
+}
+
+func isMissingTable(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "42P01"
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "does not exist")
 }

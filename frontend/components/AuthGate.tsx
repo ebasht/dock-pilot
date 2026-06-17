@@ -143,7 +143,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 className="btn btn-secondary"
-                disabled={submitting}
+                disabled={submitting || !tokenInput.trim()}
+                title={!tokenInput.trim() ? t("auth.qrNeedsToken") : undefined}
                 onClick={() => void handleShowQr()}
               >
                 {t("auth.showQr")}

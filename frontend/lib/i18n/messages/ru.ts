@@ -50,6 +50,7 @@ export const ru: Messages = {
       "Не удалось подключиться к API по адресу {apiBase}. {message}. Проверьте DNS, nginx и что контейнер API запущен.",
     checking: "Проверка…",
     showQr: "QR для телефона",
+    qrNeedsToken: "Сначала введите API-токен",
   },
   mobileQr: {
     title: "Вход с телефона",
@@ -57,6 +58,8 @@ export const ru: Messages = {
     qrAlt: "QR-код для входа с телефона",
     expiresIn: "Истекает через {time}",
     expired: "Код истёк — обновите, чтобы получить новый",
+    migrationRequired:
+      "Не применена миграция БД. На сервере выполните: docker compose run --rm migrate",
   },
   mobileAuth: {
     signingIn: "Вход…",

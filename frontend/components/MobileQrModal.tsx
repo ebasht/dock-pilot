@@ -56,7 +56,10 @@ export function MobileQrModal({
       setExpiresAt(session.expires_at);
       setCountdown(formatCountdown(session.expires_at));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Error";
+      let message = err instanceof Error ? err.message : "Error";
+      if (message === "qr auth migration required") {
+        message = t("mobileQr.migrationRequired");
+      }
       setError(message);
       setQrDataUrl(null);
       setExpiresAt(null);

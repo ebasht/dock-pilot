@@ -48,6 +48,7 @@ export const en = {
       "Cannot reach API at {apiBase}. {message}. Check DNS, nginx, and that the API container is running.",
     checking: "Checking…",
     showQr: "QR for phone",
+    qrNeedsToken: "Enter API token first",
   },
   mobileQr: {
     title: "Sign in on phone",
@@ -55,6 +56,8 @@ export const en = {
     qrAlt: "QR code for mobile sign-in",
     expiresIn: "Expires in {time}",
     expired: "Code expired — refresh to get a new one",
+    migrationRequired:
+      "Database migration missing. On the server run: docker compose run --rm migrate",
   },
   mobileAuth: {
     signingIn: "Signing in…",
