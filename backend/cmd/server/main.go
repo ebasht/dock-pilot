@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ebash/dock-pilot/backend/internal/api"
+	"github.com/ebash/dock-pilot/backend/internal/auth"
 	"github.com/ebash/dock-pilot/backend/internal/config"
 	"github.com/ebash/dock-pilot/backend/internal/deployments"
 	"github.com/ebash/dock-pilot/backend/internal/docker"
@@ -83,7 +84,8 @@ func main() {
 	notifWorker.Start(workerCtx)
 
 	logger.Info("cors allowed origins", "origins", cfg.CORSAllowedOrigins)
-	handler := api.Mount(logger, cfg.APIToken, cfg.CORSAllowedOrigins, sitesSvc, secretsSvc, deploySvc, notifSvc)
+	qrSvc := auth.NewQRService(pool, cfg.APIToken)
+	handler := api.Mount(logger, cfg.APIToken, cfg.CORSAllowedOrigins, sitesSvc, secretsSvc, deploySvc, notifSvc, api.NewQRHandler(qrSvc))
 	server := &http.Server{
 		Addr:         cfg.HTTPAddr,
 		Handler:      handler,

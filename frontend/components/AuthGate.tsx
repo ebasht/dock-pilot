@@ -8,8 +8,9 @@ import {
   setApiToken,
 } from "@/lib/auth-token";
 import { getApiBase, verifyApiToken } from "@/lib/api";
-import { AppVersion } from "@/components/AppVersion";
+import { BrandLogo } from "@/components/BrandLogo";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
+import { MobileQrModal } from "@/components/MobileQrModal";
 import { useI18n } from "@/lib/i18n/context";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -19,6 +20,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [tokenInput, setTokenInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrToken, setQrToken] = useState<string | null>(null);
 
   const [apiBase, setApiBase] = useState("");
 
@@ -68,17 +71,49 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     [tokenInput, t],
   );
 
+  const handleShowQr = useCallback(async () => {
+    setError(null);
+    const token = tokenInput.trim();
+    if (!token) {
+      setError(t("auth.enterToken"));
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await verifyApiToken(token);
+      if (!result.ok) {
+        if (result.reason === "invalid_token") {
+          setError(t("auth.invalidToken"));
+        } else {
+          setError(
+            t("auth.cannotReachApi", {
+              apiBase: getApiBase(),
+              message: result.message,
+            }),
+          );
+        }
+        return;
+      }
+      setQrToken(token);
+      setQrOpen(true);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [tokenInput, t]);
+
   if (!ready) {
     return null;
   }
 
   if (!authed) {
     return (
-      <div className="auth-screen">
-        <div className="card auth-card">
+      <>
+        <div className="auth-screen">
+          <div className="card auth-card">
           <LocaleSwitcher className="auth-locale" />
-          <h1>
-            DockPilot <AppVersion />
+          <h1 className="auth-brand">
+            <BrandLogo showVersion size="auth" />
           </h1>
           <p className="auth-hint">{t("auth.hint")}</p>
           <p className="auth-api-url">
@@ -101,12 +136,31 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
               />
             </div>
             {error && <div className="alert alert-error">{error}</div>}
-            <button type="submit" className="btn" disabled={submitting}>
-              {submitting ? t("auth.checking") : t("common.continue")}
-            </button>
+            <div className="auth-actions">
+              <button type="submit" className="btn" disabled={submitting}>
+                {submitting ? t("auth.checking") : t("common.continue")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={submitting}
+                onClick={() => void handleShowQr()}
+              >
+                {t("auth.showQr")}
+              </button>
+            </div>
           </form>
+          </div>
         </div>
-      </div>
+        <MobileQrModal
+          open={qrOpen}
+          onClose={() => {
+            setQrOpen(false);
+            setQrToken(null);
+          }}
+          provisionalToken={qrToken ?? undefined}
+        />
+      </>
     );
   }
 

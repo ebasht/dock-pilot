@@ -212,9 +212,33 @@ h3 {
 }
 
 .nav-brand {
+  display: inline-flex;
+  align-items: center;
   font-weight: 700;
-  color: var(--text);
   text-decoration: none;
+  color: var(--text);
+}
+
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-logo-img {
+  display: block;
+  width: auto;
+  height: 36px;
+}
+
+.brand-logo-auth .brand-logo-img {
+  height: 44px;
+}
+
+.auth-brand {
+  margin: 0 0 0.75rem;
+  display: flex;
+  justify-content: center;
 }
 
 .app-version {
@@ -474,4 +498,80 @@ h3 {
 
 .auth-locale {
   margin-bottom: 1rem;
+}
+
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.auth-actions .btn {
+  flex: 1 1 auto;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.modal {
+  width: min(100%, 22rem);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+.mobile-qr-modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+}
+
+.mobile-qr-hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.mobile-qr-image {
+  display: block;
+  margin: 0 auto 0.75rem;
+  border-radius: var(--radius);
+}
+
+.mobile-qr-expires,
+.mobile-qr-status {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.mobile-qr-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mobile-qr-actions .btn {
+  flex: 1;
+}
+
+.nav-mobile-qr {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.mobile-auth-card {
+  text-align: center;
+}
+
+.mobile-auth-status {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
 }

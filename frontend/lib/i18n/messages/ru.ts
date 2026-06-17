@@ -33,6 +33,7 @@ export const ru: Messages = {
     sites: "Сайты",
     notifications: "Уведомления",
     newSite: "Новый сайт",
+    mobile: "Телефон",
     logout: "Выйти",
     language: "Язык",
     langEn: "English",
@@ -48,6 +49,21 @@ export const ru: Messages = {
     cannotReachApi:
       "Не удалось подключиться к API по адресу {apiBase}. {message}. Проверьте DNS, nginx и что контейнер API запущен.",
     checking: "Проверка…",
+    showQr: "QR для телефона",
+  },
+  mobileQr: {
+    title: "Вход с телефона",
+    hint: "Отсканируйте QR-код камерой телефона. Код действует 5 минут и работает один раз.",
+    qrAlt: "QR-код для входа с телефона",
+    expiresIn: "Истекает через {time}",
+    expired: "Код истёк — обновите, чтобы получить новый",
+  },
+  mobileAuth: {
+    signingIn: "Вход…",
+    pleaseWait: "Авторизуем это устройство для мониторинга.",
+    missingCode: "Ссылка для входа отсутствует или недействительна. Создайте новый QR на компьютере.",
+    failed: "Не удалось войти",
+    retryHint: "Откройте новый QR-код в панели на компьютере и попробуйте снова.",
   },
   siteTabs: {
     ariaLabel: "Разделы сайта",

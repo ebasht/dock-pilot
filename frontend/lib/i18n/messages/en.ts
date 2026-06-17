@@ -31,6 +31,7 @@ export const en = {
     sites: "Sites",
     notifications: "Notifications",
     newSite: "New site",
+    mobile: "Mobile",
     logout: "Log out",
     language: "Language",
     langEn: "English",
@@ -46,6 +47,21 @@ export const en = {
     cannotReachApi:
       "Cannot reach API at {apiBase}. {message}. Check DNS, nginx, and that the API container is running.",
     checking: "Checking…",
+    showQr: "QR for phone",
+  },
+  mobileQr: {
+    title: "Sign in on phone",
+    hint: "Scan the QR code with your phone camera. The code is valid for 5 minutes and works once.",
+    qrAlt: "QR code for mobile sign-in",
+    expiresIn: "Expires in {time}",
+    expired: "Code expired — refresh to get a new one",
+  },
+  mobileAuth: {
+    signingIn: "Signing in…",
+    pleaseWait: "Authorizing this device for monitoring.",
+    missingCode: "Missing or invalid sign-in link. Generate a new QR code on desktop.",
+    failed: "Sign-in failed",
+    retryHint: "Open a fresh QR code from the desktop panel and try again.",
   },
   siteTabs: {
     ariaLabel: "Site sections",

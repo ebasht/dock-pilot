@@ -19,6 +19,7 @@ type Handlers struct {
 	Secrets       *SecretsHandler
 	Deployments   *DeploymentsHandler
 	Notifications *NotificationsHandler
+	QR            *QRHandler
 }
 
 func NewRouter(h Handlers, apiToken string, corsOrigins []string) http.Handler {
@@ -42,53 +43,60 @@ func NewRouter(h Handlers, apiToken string, corsOrigins []string) http.Handler {
 	})
 
 	r.Route("/api", func(r chi.Router) {
-		r.Use(BearerTokenAuth(apiToken))
+		r.Post("/auth/qr/exchange", h.QR.Exchange)
 
-		r.Route("/sites", func(r chi.Router) {
-			r.Post("/", h.Sites.Create)
-			r.Get("/", h.Sites.List)
-			r.Get("/health", h.Sites.HealthAll)
+		r.Group(func(r chi.Router) {
+			r.Use(BearerTokenAuth(apiToken))
 
-			r.Route("/{id}", func(r chi.Router) {
-				r.Get("/", h.Sites.Get)
-				r.Get("/health", h.Sites.Health)
-				r.Get("/logs/stream", h.Sites.StreamContainerLogs)
-				r.Patch("/", h.Sites.Update)
-				r.Delete("/", h.Sites.Delete)
+			r.Post("/auth/qr", h.QR.Create)
 
-				r.Post("/deploy", h.Deployments.Deploy)
-				r.Post("/container/start", h.Sites.StartContainer)
-				r.Post("/container/stop", h.Sites.StopContainer)
-				r.Post("/container/restart", h.Sites.RestartContainer)
-				r.Get("/deployments", h.Deployments.ListBySite)
+			r.Route("/sites", func(r chi.Router) {
+				r.Post("/", h.Sites.Create)
+				r.Get("/", h.Sites.List)
+				r.Get("/health", h.Sites.HealthAll)
 
-				r.Route("/secrets", func(r chi.Router) {
-					r.Get("/", h.Secrets.List)
-					r.Post("/", h.Secrets.CreateMany)
-					r.Put("/{key}", h.Secrets.Upsert)
-					r.Delete("/{key}", h.Secrets.Delete)
+				r.Route("/{id}", func(r chi.Router) {
+					r.Get("/", h.Sites.Get)
+					r.Get("/health", h.Sites.Health)
+					r.Get("/logs/stream", h.Sites.StreamContainerLogs)
+					r.Patch("/", h.Sites.Update)
+					r.Delete("/", h.Sites.Delete)
+
+					r.Post("/deploy", h.Deployments.Deploy)
+					r.Post("/container/start", h.Sites.StartContainer)
+					r.Post("/container/stop", h.Sites.StopContainer)
+					r.Post("/container/restart", h.Sites.RestartContainer)
+					r.Get("/deployments", h.Deployments.ListBySite)
+
+					r.Route("/secrets", func(r chi.Router) {
+						r.Get("/", h.Secrets.List)
+						r.Post("/", h.Secrets.CreateMany)
+						r.Put("/{key}", h.Secrets.Upsert)
+						r.Delete("/{key}", h.Secrets.Delete)
+					})
 				})
 			})
-		})
 
-		r.Route("/notifications", func(r chi.Router) {
-			r.Get("/settings", h.Notifications.GetSettings)
-			r.Put("/settings", h.Notifications.UpdateSettings)
-			r.Post("/test", h.Notifications.SendTest)
-		})
+			r.Route("/notifications", func(r chi.Router) {
+				r.Get("/settings", h.Notifications.GetSettings)
+				r.Put("/settings", h.Notifications.UpdateSettings)
+				r.Post("/test", h.Notifications.SendTest)
+			})
 
-		r.Get("/deployments/{id}/logs/stream", h.Deployments.StreamLogs)
+			r.Get("/deployments/{id}/logs/stream", h.Deployments.StreamLogs)
+		})
 	})
 
 	return r
 }
 
-func Mount(logger *slog.Logger, apiToken string, corsOrigins []string, sites *sitesvc.Service, secrets *secretpkg.Service, deployments *deploysvc.Service, notifications *notifpkg.Service) http.Handler {
+func Mount(logger *slog.Logger, apiToken string, corsOrigins []string, sites *sitesvc.Service, secrets *secretpkg.Service, deployments *deploysvc.Service, notifications *notifpkg.Service, qr *QRHandler) http.Handler {
 	_ = logger
 	return NewRouter(Handlers{
 		Sites:         NewSitesHandler(sites),
 		Secrets:       NewSecretsHandler(secrets),
 		Deployments:   NewDeploymentsHandler(deployments),
 		Notifications: NewNotificationsHandler(notifications),
+		QR:            qr,
 	}, apiToken, corsOrigins)
 }

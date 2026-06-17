@@ -202,4 +202,54 @@ export const api = {
 
   restartSiteContainer: (id: string) =>
     request<ContainerActionResult>(`/api/sites/${id}/container/restart`, { method: "POST" }),
+
+  createQRSession: () =>
+    request<{ code: string; expires_at: string }>("/api/auth/qr", { method: "POST" }),
 };
+
+export async function exchangeQRCode(code: string): Promise<string> {
+  const res = await fetch(`${getApiBase()}/api/auth/qr/exchange`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(message, res.status);
+  }
+
+  const body = (await res.json()) as { token: string };
+  return body.token;
+}
+
+export async function createQRSessionWithToken(
+  token: string,
+): Promise<{ code: string; expires_at: string }> {
+  const res = await fetch(`${getApiBase()}/api/auth/qr`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token.trim()}`,
+    },
+  });
+
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(message, res.status);
+  }
+
+  return res.json() as Promise<{ code: string; expires_at: string }>;
+}
