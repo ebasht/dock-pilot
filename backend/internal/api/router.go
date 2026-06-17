@@ -57,6 +57,9 @@ func NewRouter(h Handlers, apiToken string, corsOrigins []string) http.Handler {
 				r.Delete("/", h.Sites.Delete)
 
 				r.Post("/deploy", h.Deployments.Deploy)
+				r.Post("/container/start", h.Sites.StartContainer)
+				r.Post("/container/stop", h.Sites.StopContainer)
+				r.Post("/container/restart", h.Sites.RestartContainer)
 				r.Get("/deployments", h.Deployments.ListBySite)
 
 				r.Route("/secrets", func(r chi.Router) {

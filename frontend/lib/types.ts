@@ -23,6 +23,17 @@ export interface SiteHealthHTTP {
   error?: string;
 }
 
+export interface ContainerActionResult {
+  action: string;
+  container: {
+    found: boolean;
+    running: boolean;
+    state: string;
+    health: string;
+    container?: string;
+  };
+}
+
 export interface ContainerLogLine {
   seq: number;
   stream: string;

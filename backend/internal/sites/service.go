@@ -18,6 +18,11 @@ import (
 	"github.com/ebash/dock-pilot/backend/internal/healthcheck"
 )
 
+// DeploySecrets loads decrypted secrets for running a site container.
+type DeploySecrets interface {
+	DecryptForDeploy(ctx context.Context, siteID uuid.UUID) (map[string]string, error)
+}
+
 var slugPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
 type Service struct {
@@ -25,10 +30,11 @@ type Service struct {
 	queries *db.Queries
 	health  *healthcheck.Checker
 	docker  docker.Client
+	secrets DeploySecrets
 }
 
-func NewService(pool *pgxpool.Pool, queries *db.Queries, checker *healthcheck.Checker, dockerClient docker.Client) *Service {
-	return &Service{pool: pool, queries: queries, health: checker, docker: dockerClient}
+func NewService(pool *pgxpool.Pool, queries *db.Queries, checker *healthcheck.Checker, dockerClient docker.Client, secretsSvc DeploySecrets) *Service {
+	return &Service{pool: pool, queries: queries, health: checker, docker: dockerClient, secrets: secretsSvc}
 }
 
 func (s *Service) Create(ctx context.Context, req CreateSiteRequest) (SiteResponse, error) {

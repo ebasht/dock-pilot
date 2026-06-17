@@ -71,8 +71,8 @@ func main() {
 	logger.Info("deploy mode", "mode", cfg.Deploy.Mode, "work_dir", cfg.Deploy.WorkDir)
 
 	healthChecker := healthcheck.NewChecker(dockerClient)
-	sitesSvc := sites.NewService(pool, queries, healthChecker, dockerClient)
 	secretsSvc := secrets.NewService(queries, cipher)
+	sitesSvc := sites.NewService(pool, queries, healthChecker, dockerClient, secretsSvc)
 	notifSvc := notifications.NewService(queries, cipher, sitesSvc)
 	worker := deployments.NewWorker(queries, dockerClient, nginxMgr, sslMgr, secretsSvc, cfg.Deploy.WorkDir, logger)
 	deploySvc := deployments.NewService(queries, worker)

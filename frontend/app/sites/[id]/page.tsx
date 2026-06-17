@@ -20,6 +20,8 @@ export default function SiteDetailPage() {
   const [latestDep, setLatestDep] = useState<Deployment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
+  const [containerBusy, setContainerBusy] = useState<"start" | "stop" | "restart" | null>(null);
+  const [healthRefreshKey, setHealthRefreshKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -58,6 +60,22 @@ export default function SiteDetailPage() {
     router.push("/sites");
   };
 
+  const handleContainerAction = async (action: "start" | "stop" | "restart") => {
+    setContainerBusy(action);
+    setError(null);
+    try {
+      if (action === "start") await api.startSiteContainer(id);
+      else if (action === "stop") await api.stopSiteContainer(id);
+      else await api.restartSiteContainer(id);
+      await load();
+      setHealthRefreshKey((k) => k + 1);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : t("site.containerActionFailed"));
+    } finally {
+      setContainerBusy(null);
+    }
+  };
+
   if (!site && !error) {
     return <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>;
   }
@@ -70,6 +88,8 @@ export default function SiteDetailPage() {
 
   const typeLabel =
     site.site_type === "telegram_bot" ? t("sites.typeTelegramBot") : t("sites.typeWebsite");
+  const canControlContainer = site.status !== "draft";
+  const busy = deploying || containerBusy !== null;
 
   return (
     <div>
@@ -88,19 +108,44 @@ export default function SiteDetailPage() {
             · <StatusBadge status={site.status} />
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button
             type="button"
             className="btn"
             onClick={handleDeploy}
-            disabled={deploying}
+            disabled={busy}
           >
             {deploying ? t("site.starting") : t("site.deploy")}
           </button>
           <button
             type="button"
+            className="btn btn-secondary"
+            onClick={() => handleContainerAction("start")}
+            disabled={busy || !canControlContainer}
+          >
+            {containerBusy === "start" ? t("site.starting") : t("site.start")}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => handleContainerAction("stop")}
+            disabled={busy || !canControlContainer}
+          >
+            {containerBusy === "stop" ? t("site.stopping") : t("site.stop")}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => handleContainerAction("restart")}
+            disabled={busy || !canControlContainer}
+          >
+            {containerBusy === "restart" ? t("site.restarting") : t("site.restart")}
+          </button>
+          <button
+            type="button"
             className="btn btn-danger"
             onClick={handleDelete}
+            disabled={busy}
           >
             {t("common.delete")}
           </button>
@@ -111,7 +156,7 @@ export default function SiteDetailPage() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <SiteHealthPanel siteId={id} />
+      <SiteHealthPanel key={healthRefreshKey} siteId={id} />
 
       <div className="grid-2" style={{ marginTop: "1.5rem" }}>
         <div className="card">

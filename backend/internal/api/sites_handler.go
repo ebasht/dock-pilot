@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -144,6 +145,36 @@ func (h *SitesHandler) StreamContainerLogs(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("X-Accel-Buffering", "no")
 
 	_ = h.sites.StreamContainerLogs(r.Context(), id, tail, w, flusher)
+}
+
+func (h *SitesHandler) StartContainer(w http.ResponseWriter, r *http.Request) {
+	h.containerAction(w, r, h.sites.StartContainer)
+}
+
+func (h *SitesHandler) StopContainer(w http.ResponseWriter, r *http.Request) {
+	h.containerAction(w, r, h.sites.StopContainer)
+}
+
+func (h *SitesHandler) RestartContainer(w http.ResponseWriter, r *http.Request) {
+	h.containerAction(w, r, h.sites.RestartContainer)
+}
+
+func (h *SitesHandler) containerAction(
+	w http.ResponseWriter,
+	r *http.Request,
+	fn func(context.Context, uuid.UUID) (sitesvc.ContainerActionResponse, error),
+) {
+	id, err := parseUUID(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, sitesvc.ErrInvalidInput)
+		return
+	}
+	resp, err := fn(r.Context(), id)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func parseUUID(s string) (uuid.UUID, error) {

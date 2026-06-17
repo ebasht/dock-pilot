@@ -5,6 +5,7 @@ import {
 } from "./auth-token";
 import { normalizeSecretMeta, normalizeSite } from "./normalize";
 import type {
+  ContainerActionResult,
   CreateSiteRequest,
   Deployment,
   NotificationSettings,
@@ -192,4 +193,13 @@ export const api = {
 
   sendNotificationTest: () =>
     request<{ status: string }>("/api/notifications/test", { method: "POST" }),
+
+  startSiteContainer: (id: string) =>
+    request<ContainerActionResult>(`/api/sites/${id}/container/start`, { method: "POST" }),
+
+  stopSiteContainer: (id: string) =>
+    request<ContainerActionResult>(`/api/sites/${id}/container/stop`, { method: "POST" }),
+
+  restartSiteContainer: (id: string) =>
+    request<ContainerActionResult>(`/api/sites/${id}/container/restart`, { method: "POST" }),
 };
