@@ -2,6 +2,7 @@
 
 import { KeyValueEditor } from "@/components/KeyValueEditor";
 import type { EnvVar } from "@/lib/types";
+import { useI18n } from "@/lib/i18n/context";
 
 type Props = {
   envVars: EnvVar[];
@@ -9,6 +10,8 @@ type Props = {
 };
 
 export function EnvVarList({ envVars, onChange }: Props) {
+  const { t } = useI18n();
+
   return (
     <KeyValueEditor
       rows={envVars}
@@ -16,7 +19,7 @@ export function EnvVarList({ envVars, onChange }: Props) {
       valueInputType="text"
       keyPlaceholder="PORT"
       valuePlaceholder="3000"
-      addLabel="Add env var"
+      addLabel={t("kvEditor.addEnvVar")}
     />
   );
 }

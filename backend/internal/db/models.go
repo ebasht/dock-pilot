@@ -97,6 +97,7 @@ type NotificationSettings struct {
 	TelegramHttpProxy          string             `json:"telegram_http_proxy"`
 	DailyDigestEnabled         bool               `json:"daily_digest_enabled"`
 	DailyDigestHour            int32              `json:"daily_digest_hour"`
+	DailyDigestTimezone        string             `json:"daily_digest_timezone"`
 	AlertOnIncidentEnabled     bool               `json:"alert_on_incident_enabled"`
 	EncryptedTelegramBotToken  []byte             `json:"encrypted_telegram_bot_token"`
 	LastDailySentAt            pgtype.Timestamptz `json:"last_daily_sent_at"`

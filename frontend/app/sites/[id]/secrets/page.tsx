@@ -5,10 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 import { KeyValueEditor } from "@/components/KeyValueEditor";
 import { SiteTabs } from "@/components/SiteTabs";
 import { api, ApiError } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 import type { EnvVar, SecretMeta, Site } from "@/lib/types";
 
 export default function SiteSecretsPage() {
   const { id } = useParams<{ id: string }>();
+  const { t, formatDateTime } = useI18n();
   const [site, setSite] = useState<Site | null>(null);
   const [secrets, setSecrets] = useState<SecretMeta[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -25,9 +27,9 @@ export default function SiteSecretsPage() {
       setSecrets(sec);
       setError(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to load");
+      setError(e instanceof ApiError ? e.message : t("secrets.loadFailed"));
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     load();
@@ -47,45 +49,48 @@ export default function SiteSecretsPage() {
       setDraft([{ key: "", value: "" }]);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to save secret");
+      setError(err instanceof ApiError ? err.message : t("secrets.saveFailed"));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (key: string) => {
-    if (!confirm(`Delete secret "${key}"?`)) return;
+    if (!confirm(t("secrets.deleteConfirm", { key }))) return;
     try {
       await api.deleteSecret(id, key);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to delete");
+      setError(err instanceof ApiError ? err.message : t("secrets.deleteFailed"));
     }
   };
 
   return (
     <div>
-      <h1>{site?.name ?? "Secrets"}</h1>
+      <h1>{site?.name ?? t("secrets.title")}</h1>
       <SiteTabs siteId={id} active="secrets" />
 
       <p style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
-        Secret values are encrypted at rest and are never returned after saving.
-        Private GitHub: <code>GIT_TOKEN</code> / <code>GITHUB_TOKEN</code> (PAT + HTTPS
-        URL) or <code>GIT_SSH_KEY</code> (deploy key + <code>git@github.com:…</code>).
+        {t("secrets.hint", {
+          gitToken: "GIT_TOKEN",
+          githubToken: "GITHUB_TOKEN",
+          gitSshKey: "GIT_SSH_KEY",
+          sshUrl: "git@github.com:…",
+        })}
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card" style={{ marginBottom: "1.5rem" }}>
-        <h2>Stored secrets</h2>
+        <h2>{t("secrets.storedSecrets")}</h2>
         {secrets.length === 0 ? (
-          <p style={{ color: "var(--muted)" }}>No secrets configured.</p>
+          <p style={{ color: "var(--muted)" }}>{t("secrets.noSecrets")}</p>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Updated</th>
+                <th>{t("common.name")}</th>
+                <th>{t("common.updated")}</th>
                 <th></th>
               </tr>
             </thead>
@@ -93,9 +98,9 @@ export default function SiteSecretsPage() {
               {secrets.map((s, idx) => (
                 <tr key={s.key || `secret-${idx}`}>
                   <td>
-                    <code>{s.key || "(missing name — re-add below)"}</code>
+                    <code>{s.key || t("secrets.missingName")}</code>
                   </td>
-                  <td>{new Date(s.updated_at).toLocaleString()}</td>
+                  <td>{formatDateTime(s.updated_at)}</td>
                   <td>
                     <button
                       type="button"
@@ -104,7 +109,7 @@ export default function SiteSecretsPage() {
                       onClick={() => handleDelete(s.key)}
                       disabled={!s.key}
                     >
-                      Delete
+                      {t("common.delete")}
                     </button>
                   </td>
                 </tr>
@@ -115,21 +120,20 @@ export default function SiteSecretsPage() {
       </div>
 
       <form onSubmit={handleAdd} className="card">
-        <h2>Add or rotate secret</h2>
+        <h2>{t("secrets.addOrRotate")}</h2>
         <p style={{ color: "var(--muted)", fontSize: "0.875rem", marginBottom: "0.75rem" }}>
-          Two fields per secret: <strong>Name</strong> (e.g. <code>BOT_TOKEN</code>) and{" "}
-          <strong>Value</strong>.
+          {t("secrets.addHint")}
         </p>
         <KeyValueEditor
           rows={draft}
           onChange={setDraft}
           valueInputType="password"
-          keyPlaceholder="BOT_TOKEN"
-          valuePlaceholder="secret value"
-          addLabel="Add another secret"
+          keyPlaceholder={t("secrets.keyPlaceholder")}
+          valuePlaceholder={t("secrets.valuePlaceholder")}
+          addLabel={t("secrets.addAnother")}
         />
         <button type="submit" className="btn" disabled={saving}>
-          {saving ? "Saving…" : "Save secret(s)"}
+          {saving ? t("common.saving") : t("secrets.saveSecrets")}
         </button>
       </form>
     </div>

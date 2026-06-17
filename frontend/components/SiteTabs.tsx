@@ -1,16 +1,15 @@
-import Link from "next/link";
+"use client";
 
-const tabs = [
-  { key: "overview", href: (id: string) => `/sites/${id}`, label: "Overview" },
-  { key: "logs", href: (id: string) => `/sites/${id}/logs`, label: "Logs" },
-  { key: "settings", href: (id: string) => `/sites/${id}/settings`, label: "Settings" },
-  { key: "secrets", href: (id: string) => `/sites/${id}/secrets`, label: "Secrets" },
-  {
-    key: "deployments",
-    href: (id: string) => `/sites/${id}/deployments`,
-    label: "Deployments",
-  },
-];
+import Link from "next/link";
+import { useI18n } from "@/lib/i18n/context";
+
+const TAB_KEYS = [
+  { key: "overview", path: (id: string) => `/sites/${id}` },
+  { key: "logs", path: (id: string) => `/sites/${id}/logs` },
+  { key: "settings", path: (id: string) => `/sites/${id}/settings` },
+  { key: "secrets", path: (id: string) => `/sites/${id}/secrets` },
+  { key: "deployments", path: (id: string) => `/sites/${id}/deployments` },
+] as const;
 
 export function SiteTabs({
   siteId,
@@ -19,10 +18,12 @@ export function SiteTabs({
   siteId: string;
   active: string;
 }) {
+  const { t } = useI18n();
+
   return (
     <nav
       className="site-tabs"
-      aria-label="Site sections"
+      aria-label={t("siteTabs.ariaLabel")}
       style={{
         display: "flex",
         gap: "0.25rem",
@@ -32,12 +33,12 @@ export function SiteTabs({
         paddingBottom: "0.5rem",
       }}
     >
-      {tabs.map((tab) => {
+      {TAB_KEYS.map((tab) => {
         const isActive = active === tab.key;
         return (
           <Link
             key={tab.key}
-            href={tab.href(siteId)}
+            href={tab.path(siteId)}
             className={isActive ? "site-tab site-tab-active" : "site-tab"}
             style={{
               display: "inline-block",
@@ -50,7 +51,7 @@ export function SiteTabs({
               border: isActive ? "1px solid var(--border)" : "1px solid transparent",
             }}
           >
-            {tab.label}
+            {t(`siteTabs.${tab.key}`)}
           </Link>
         );
       })}

@@ -444,3 +444,34 @@ h3 {
   padding: 0.35rem 0.75rem;
   font-size: 0.8rem;
 }
+
+.locale-switcher {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.locale-btn {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  cursor: pointer;
+}
+
+.locale-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.locale-btn-active {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.auth-locale {
+  margin-bottom: 1rem;
+}

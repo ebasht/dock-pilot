@@ -6,24 +6,15 @@ import { useState } from "react";
 import { EnvVarList } from "@/components/EnvVarList";
 import { KeyValueEditor } from "@/components/KeyValueEditor";
 import { api, ApiError } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 import type { WizardState } from "@/lib/types";
 
-const WEB_STEPS = [
-  "Basic",
-  "Repository",
-  "Docker",
-  "Environment",
-  "Nginx & SSL",
-  "Review",
-] as const;
+const WEB_STEP_KEYS = ["basic", "repository", "docker", "environment", "nginxSsl", "review"] as const;
+const BOT_STEP_KEYS = ["basic", "repository", "docker", "environment", "review"] as const;
 
-const BOT_STEPS = [
-  "Basic",
-  "Repository",
-  "Docker",
-  "Environment",
-  "Review",
-] as const;
+type WebStepKey = (typeof WEB_STEP_KEYS)[number];
+type BotStepKey = (typeof BOT_STEP_KEYS)[number];
+type StepKey = WebStepKey | BotStepKey;
 
 const initialState: WizardState = {
   siteType: "web",
@@ -45,12 +36,14 @@ const initialState: WizardState = {
 
 export default function NewSiteWizardPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<WizardState>(initialState);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const steps = data.siteType === "telegram_bot" ? BOT_STEPS : WEB_STEPS;
+  const stepKeys = data.siteType === "telegram_bot" ? BOT_STEP_KEYS : WEB_STEP_KEYS;
+  const stepKey = stepKeys[step] as StepKey;
 
   const update = (patch: Partial<WizardState>) =>
     setData((d) => {
@@ -62,10 +55,8 @@ export default function NewSiteWizardPage() {
       return next;
     });
 
-  const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
+  const next = () => setStep((s) => Math.min(s + 1, stepKeys.length - 1));
   const back = () => setStep((s) => Math.max(s - 1, 0));
-
-  const stepKey = steps[step];
 
   const handleDeploy = async () => {
     setSubmitting(true);
@@ -111,21 +102,21 @@ export default function NewSiteWizardPage() {
       await api.deploySite(site.id);
       router.push(`/sites/${site.id}/deployments`);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to create site");
+      setError(e instanceof ApiError ? e.message : t("wizard.createFailed"));
       setSubmitting(false);
     }
   };
 
   return (
     <div>
-      <h1>New site</h1>
+      <h1>{t("wizard.title")}</h1>
       <div className="wizard-steps">
-        {steps.map((label, i) => (
+        {stepKeys.map((key, i) => (
           <span
-            key={label}
+            key={key}
             className={`wizard-step ${i === step ? "active" : ""} ${i < step ? "done" : ""}`}
           >
-            {i + 1}. {label}
+            {i + 1}. {t(`wizard.steps.${key}`)}
           </span>
         ))}
       </div>
@@ -133,23 +124,23 @@ export default function NewSiteWizardPage() {
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card">
-        {stepKey === "Basic" && <StepBasic data={data} update={update} />}
-        {stepKey === "Repository" && <StepRepo data={data} update={update} />}
-        {stepKey === "Docker" && <StepDocker data={data} update={update} />}
-        {stepKey === "Environment" && <StepEnv data={data} update={update} />}
-        {stepKey === "Nginx & SSL" && <StepNginx data={data} update={update} />}
-        {stepKey === "Review" && <StepReview data={data} />}
+        {stepKey === "basic" && <StepBasic data={data} update={update} />}
+        {stepKey === "repository" && <StepRepo data={data} update={update} />}
+        {stepKey === "docker" && <StepDocker data={data} update={update} />}
+        {stepKey === "environment" && <StepEnv data={data} update={update} />}
+        {stepKey === "nginxSsl" && <StepNginx data={data} update={update} />}
+        {stepKey === "review" && <StepReview data={data} />}
       </div>
 
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
         {step > 0 && (
           <button type="button" className="btn btn-secondary" onClick={back}>
-            Back
+            {t("common.back")}
           </button>
         )}
-        {step < steps.length - 1 ? (
+        {step < stepKeys.length - 1 ? (
           <button type="button" className="btn" onClick={next}>
-            Continue
+            {t("common.continue")}
           </button>
         ) : (
           <button
@@ -158,11 +149,11 @@ export default function NewSiteWizardPage() {
             onClick={handleDeploy}
             disabled={submitting}
           >
-            {submitting ? "Deploying…" : "Create & deploy"}
+            {submitting ? t("wizard.deploying") : t("wizard.createAndDeploy")}
           </button>
         )}
         <Link href="/sites" className="btn btn-secondary">
-          Cancel
+          {t("common.cancel")}
         </Link>
       </div>
     </div>
@@ -176,11 +167,13 @@ function StepBasic({
   data: WizardState;
   update: (p: Partial<WizardState>) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <>
-      <h2>Basic settings</h2>
+      <h2>{t("wizard.basic.heading")}</h2>
       <div className="field">
-        <label className="label">Type</label>
+        <label className="label">{t("wizard.basic.type")}</label>
         <select
           className="input"
           value={data.siteType}
@@ -188,43 +181,46 @@ function StepBasic({
             update({ siteType: e.target.value as WizardState["siteType"] })
           }
         >
-          <option value="web">Website (nginx + SSL)</option>
-          <option value="telegram_bot">Telegram bot (Docker only)</option>
+          <option value="web">{t("wizard.basic.typeWebsite")}</option>
+          <option value="telegram_bot">{t("wizard.basic.typeTelegramBot")}</option>
         </select>
       </div>
       <div className="field">
-        <label className="label">Name</label>
+        <label className="label">{t("wizard.basic.name")}</label>
         <input
           className="input"
           value={data.name}
           onChange={(e) => update({ name: e.target.value })}
-          placeholder={data.siteType === "telegram_bot" ? "My Bot" : "My App"}
+          placeholder={
+            data.siteType === "telegram_bot"
+              ? t("wizard.basic.namePlaceholderBot")
+              : t("wizard.basic.namePlaceholderWeb")
+          }
         />
       </div>
       <div className="field">
-        <label className="label">Slug (optional)</label>
+        <label className="label">{t("wizard.basic.slug")}</label>
         <input
           className="input"
           value={data.slug}
           onChange={(e) => update({ slug: e.target.value })}
-          placeholder="my-app"
+          placeholder={t("wizard.basic.slugPlaceholder")}
         />
       </div>
       {data.siteType === "web" && (
         <div className="field">
-          <label className="label">Primary URL</label>
+          <label className="label">{t("wizard.basic.primaryUrl")}</label>
           <input
             className="input"
             value={data.primaryUrl}
             onChange={(e) => update({ primaryUrl: e.target.value })}
-            placeholder="https://app.example.com"
+            placeholder={t("wizard.basic.primaryUrlPlaceholder")}
           />
         </div>
       )}
       {data.siteType === "telegram_bot" && (
         <p style={{ color: "var(--muted)", fontSize: "0.875rem", margin: 0 }}>
-          Bot runs in Docker with long polling — no domain or nginx required.
-          Put <code>BOT_TOKEN</code> in secrets on the next steps.
+          {t("wizard.basic.telegramHint")}
         </p>
       )}
     </>
@@ -238,25 +234,25 @@ function StepRepo({
   data: WizardState;
   update: (p: Partial<WizardState>) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <>
-      <h2>Source repository</h2>
+      <h2>{t("wizard.repo.heading")}</h2>
       <p style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
-        Public repos work without credentials. For private GitHub repos add a secret on
-        the next step: <code>GIT_TOKEN</code> (HTTPS + PAT) or{" "}
-        <code>GIT_SSH_KEY</code> (SSH URL <code>git@github.com:…</code>).
+        {t("wizard.repo.hint")}
       </p>
       <div className="field">
-        <label className="label">Git repository URL</label>
+        <label className="label">{t("wizard.repo.gitUrl")}</label>
         <input
           className="input"
           value={data.gitRepoUrl}
           onChange={(e) => update({ gitRepoUrl: e.target.value })}
-          placeholder="https://github.com/org/repo.git"
+          placeholder={t("wizard.repo.gitUrlPlaceholder")}
         />
       </div>
       <div className="field">
-        <label className="label">Branch</label>
+        <label className="label">{t("wizard.repo.branch")}</label>
         <input
           className="input"
           value={data.gitBranch}
@@ -274,12 +270,14 @@ function StepDocker({
   data: WizardState;
   update: (p: Partial<WizardState>) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <>
-      <h2>Docker settings</h2>
+      <h2>{t("wizard.docker.heading")}</h2>
       <div className="grid-2">
         <div className="field">
-          <label className="label">Dockerfile path</label>
+          <label className="label">{t("wizard.docker.dockerfilePath")}</label>
           <input
             className="input"
             value={data.dockerfilePath}
@@ -287,7 +285,7 @@ function StepDocker({
           />
         </div>
         <div className="field">
-          <label className="label">Build context</label>
+          <label className="label">{t("wizard.docker.buildContext")}</label>
           <input
             className="input"
             value={data.buildContext}
@@ -297,9 +295,7 @@ function StepDocker({
       </div>
       {data.siteType === "web" && (
         <div className="field">
-          <label className="label">
-            Container port (inside the image: EXPOSE / listen port)
-          </label>
+          <label className="label">{t("wizard.docker.containerPort")}</label>
           <input
             className="input"
             type="number"
@@ -317,11 +313,7 @@ function StepDocker({
           onChange={(e) => update({ dockerNetworkHost: e.target.checked })}
           style={{ marginTop: "0.2rem" }}
         />
-        <span>
-          <strong>Host network</strong> (<code>network_mode: host</code>) — container
-          shares the VPS network stack. No port mapping; nginx proxies to container port
-          on localhost.
-        </span>
+        <span>{t("wizard.docker.hostNetwork")}</span>
       </label>
     </>
   );
@@ -334,29 +326,31 @@ function StepEnv({
   data: WizardState;
   update: (p: Partial<WizardState>) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <>
-      <h2>Environment & secrets</h2>
+      <h2>{t("wizard.env.heading")}</h2>
       <p style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
         {data.siteType === "telegram_bot"
-          ? "Add BOT_TOKEN as a secret (recommended) or env var."
-          : "For private GitHub: add secret GIT_TOKEN (PAT) or GIT_SSH_KEY (deploy key). Other secrets are encrypted and never shown again."}
+          ? t("wizard.env.hintBot")
+          : t("wizard.env.hintWeb")}
       </p>
 
-      <h3 style={{ marginTop: "1.5rem" }}>Environment variables</h3>
+      <h3 style={{ marginTop: "1.5rem" }}>{t("wizard.env.environmentVariables")}</h3>
       <EnvVarList
         envVars={data.envVars}
         onChange={(envVars) => update({ envVars })}
       />
 
-      <h3 style={{ marginTop: "1.5rem" }}>Secrets</h3>
+      <h3 style={{ marginTop: "1.5rem" }}>{t("wizard.env.secrets")}</h3>
       <KeyValueEditor
         rows={data.secrets}
         onChange={(secrets) => update({ secrets })}
         valueInputType="password"
-        keyPlaceholder="GIT_TOKEN"
-        valuePlaceholder="secret value"
-        addLabel="Add secret"
+        keyPlaceholder={t("wizard.env.gitTokenPlaceholder")}
+        valuePlaceholder={t("secrets.valuePlaceholder")}
+        addLabel={t("wizard.env.addSecret")}
       />
     </>
   );
@@ -369,11 +363,13 @@ function StepNginx({
   data: WizardState;
   update: (p: Partial<WizardState>) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <>
-      <h2>Nginx & SSL</h2>
+      <h2>{t("wizard.nginx.heading")}</h2>
       <div className="field">
-        <label className="label">Domain aliases (one per line)</label>
+        <label className="label">{t("wizard.nginx.aliases")}</label>
         <textarea
           className="textarea"
           value={data.aliases.join("\n")}
@@ -382,7 +378,7 @@ function StepNginx({
               aliases: e.target.value.split("\n").filter(Boolean),
             })
           }
-          placeholder="www.example.com"
+          placeholder={t("wizard.nginx.aliasesPlaceholder")}
         />
       </div>
       <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
@@ -391,7 +387,7 @@ function StepNginx({
           checked={data.nginxSslEnabled}
           onChange={(e) => update({ nginxSslEnabled: e.target.checked })}
         />
-        Enable SSL (certbot)
+        {t("wizard.nginx.enableSsl")}
       </label>
       <label
         style={{
@@ -406,46 +402,52 @@ function StepNginx({
           checked={data.nginxForceHttps}
           onChange={(e) => update({ nginxForceHttps: e.target.checked })}
         />
-        Force HTTPS redirect
+        {t("wizard.nginx.forceHttps")}
       </label>
     </>
   );
 }
 
 function StepReview({ data }: { data: WizardState }) {
+  const { t } = useI18n();
+
   return (
     <>
-      <h2>Review</h2>
+      <h2>{t("wizard.review.heading")}</h2>
       <dl style={{ margin: 0 }}>
         <ReviewRow
-          label="Type"
-          value={data.siteType === "telegram_bot" ? "Telegram bot" : "Website"}
+          label={t("common.type")}
+          value={
+            data.siteType === "telegram_bot"
+              ? t("sites.typeTelegramBot")
+              : t("sites.typeWebsite")
+          }
         />
-        <ReviewRow label="Name" value={data.name} />
+        <ReviewRow label={t("wizard.basic.name")} value={data.name} />
         {data.siteType === "web" && (
-          <ReviewRow label="Primary URL" value={data.primaryUrl} />
+          <ReviewRow label={t("wizard.review.primaryUrl")} value={data.primaryUrl} />
         )}
-        <ReviewRow label="Repository" value={data.gitRepoUrl} />
-        <ReviewRow label="Branch" value={data.gitBranch} />
+        <ReviewRow label={t("wizard.review.repository")} value={data.gitRepoUrl} />
+        <ReviewRow label={t("wizard.review.branch")} value={data.gitBranch} />
         <ReviewRow
-          label="Docker"
+          label={t("wizard.review.docker")}
           value={
             data.siteType === "telegram_bot"
               ? data.dockerfilePath
-              : `${data.dockerfilePath} (port ${data.containerPort})`
+              : `${data.dockerfilePath} (${t("wizard.review.portSuffix", { port: data.containerPort })})`
           }
         />
         <ReviewRow
-          label="Env vars"
+          label={t("wizard.review.envVars")}
           value={String(data.envVars.filter((e) => e.key).length)}
         />
         <ReviewRow
-          label="Secrets"
+          label={t("wizard.review.secrets")}
           value={String(data.secrets.filter((s) => s.key.trim()).length)}
         />
         <ReviewRow
-          label="SSL"
-          value={data.nginxSslEnabled ? "Enabled" : "Disabled"}
+          label={t("wizard.review.ssl")}
+          value={data.nginxSslEnabled ? t("common.enabled") : t("common.disabled")}
         />
       </dl>
     </>
@@ -453,10 +455,12 @@ function StepReview({ data }: { data: WizardState }) {
 }
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
+  const { t } = useI18n();
+
   return (
     <div style={{ marginBottom: "0.5rem" }}>
       <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>{label}</span>
-      <div>{value || "—"}</div>
+      <div>{value || t("common.emDash")}</div>
     </div>
   );
 }

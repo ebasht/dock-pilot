@@ -1,6 +1,6 @@
 .PHONY: up down reset migrate logs backend frontend dev dev-run setup \
 	docker-build docker-export docker-build-api docker-build-frontend \
-	release install
+	release install pushandrelease
 
 # --- Docker (PostgreSQL) ---
 
@@ -67,6 +67,14 @@ dock-pilot-migrate:
 release:
 	@chmod +x scripts/*.sh 2>/dev/null || true
 	@./scripts/make-release.sh $(VERSION)
+
+# Commit all, tag, push branch + tag (CI builds release on tag push).
+#   make pushandrelease MSG="Release message"
+#   make pushandrelease MSG="Release message" TAG=v0.1.13
+# TAG is optional — bumps patch on latest v* tag (v0.1.12 -> v0.1.13).
+pushandrelease:
+	@chmod +x scripts/*.sh 2>/dev/null || true
+	@MSG="$(MSG)" TAG="$(TAG)" ./scripts/push-and-release.sh
 
 install:
 	@chmod +x scripts/*.sh 2>/dev/null || true

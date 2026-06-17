@@ -9,8 +9,11 @@ import {
 } from "@/lib/auth-token";
 import { getApiBase, verifyApiToken } from "@/lib/api";
 import { AppVersion } from "@/components/AppVersion";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
+import { useI18n } from "@/lib/i18n/context";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [tokenInput, setTokenInput] = useState("");
@@ -35,7 +38,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setError(null);
       const token = tokenInput.trim();
       if (!token) {
-        setError("Enter API token");
+        setError(t("auth.enterToken"));
         return;
       }
 
@@ -44,11 +47,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         const result = await verifyApiToken(token);
         if (!result.ok) {
           if (result.reason === "invalid_token") {
-            setError("Invalid API token");
+            setError(t("auth.invalidToken"));
           } else {
             setError(
-              `Cannot reach API at ${getApiBase()}. ${result.message}. ` +
-                "Check DNS, nginx, and that the API container is running.",
+              t("auth.cannotReachApi", {
+                apiBase: getApiBase(),
+                message: result.message,
+              }),
             );
           }
           return;
@@ -60,7 +65,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         setSubmitting(false);
       }
     },
-    [tokenInput],
+    [tokenInput, t],
   );
 
   if (!ready) {
@@ -71,20 +76,18 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="auth-screen">
         <div className="card auth-card">
+          <LocaleSwitcher className="auth-locale" />
           <h1>
             DockPilot <AppVersion />
           </h1>
-          <p className="auth-hint">
-            Enter the API token to access the control panel. The token is stored
-            in this browser session only.
-          </p>
+          <p className="auth-hint">{t("auth.hint")}</p>
           <p className="auth-api-url">
-            API: <code>{apiBase || getApiBase()}</code>
+            {t("auth.apiLabel")}: <code>{apiBase || getApiBase()}</code>
           </p>
           <form onSubmit={handleSubmit}>
             <div className="field">
               <label className="label" htmlFor="api-token">
-                API token
+                {t("auth.tokenLabel")}
               </label>
               <input
                 id="api-token"
@@ -94,12 +97,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
                 autoFocus
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
-                placeholder="Value from API_TOKEN in server .env"
+                placeholder={t("auth.tokenPlaceholder")}
               />
             </div>
             {error && <div className="alert alert-error">{error}</div>}
             <button type="submit" className="btn" disabled={submitting}>
-              {submitting ? "Checking…" : "Continue"}
+              {submitting ? t("auth.checking") : t("common.continue")}
             </button>
           </form>
         </div>

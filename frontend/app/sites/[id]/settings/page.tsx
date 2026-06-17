@@ -5,10 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 import { EnvVarList } from "@/components/EnvVarList";
 import { SiteTabs } from "@/components/SiteTabs";
 import { api, ApiError } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 import type { CreateSiteRequest, EnvVar, Site } from "@/lib/types";
 
 export default function SiteSettingsPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useI18n();
   const [site, setSite] = useState<Site | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -56,9 +58,9 @@ export default function SiteSettingsPage() {
       setDockerNetworkHost(s.docker_network_host ?? false);
       setError(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to load");
+      setError(e instanceof ApiError ? e.message : t("siteSettings.loadFailed"));
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     load();
@@ -109,35 +111,35 @@ export default function SiteSettingsPage() {
       setSaved(true);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Save failed");
+      setError(err instanceof ApiError ? err.message : t("siteSettings.saveFailed"));
     } finally {
       setSaving(false);
     }
   };
 
-  if (!site && !error) return <p style={{ color: "var(--muted)" }}>Loading…</p>;
+  if (!site && !error) return <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>;
 
   return (
     <div>
-      <h1>{site?.name ?? "Settings"}</h1>
+      <h1>{site?.name ?? t("siteSettings.title")}</h1>
       <SiteTabs siteId={id} active="settings" />
 
       {error && <div className="alert alert-error">{error}</div>}
       {saved && (
         <div className="alert" style={{ background: "#14532d", color: "#86efac" }}>
-          Settings saved.
+          {t("siteSettings.saved")}
         </div>
       )}
 
       <form onSubmit={handleSave} className="card">
-        <h2>Site settings</h2>
+        <h2>{t("siteSettings.heading")}</h2>
         <div className="field">
-          <label className="label">Name</label>
+          <label className="label">{t("common.name")}</label>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         {site?.site_type === "web" && (
           <div className="field">
-            <label className="label">Primary URL</label>
+            <label className="label">{t("siteSettings.primaryUrl")}</label>
             <input
               className="input"
               value={primaryUrl}
@@ -146,7 +148,7 @@ export default function SiteSettingsPage() {
           </div>
         )}
         <div className="field">
-          <label className="label">Git repository</label>
+          <label className="label">{t("siteSettings.gitRepository")}</label>
           <input
             className="input"
             value={gitRepoUrl}
@@ -154,7 +156,7 @@ export default function SiteSettingsPage() {
           />
         </div>
         <div className="field">
-          <label className="label">Branch</label>
+          <label className="label">{t("siteSettings.branch")}</label>
           <input
             className="input"
             value={gitBranch}
@@ -163,7 +165,7 @@ export default function SiteSettingsPage() {
         </div>
         <div className="grid-2">
           <div className="field">
-            <label className="label">Dockerfile</label>
+            <label className="label">{t("siteSettings.dockerfile")}</label>
             <input
               className="input"
               value={dockerfilePath}
@@ -171,7 +173,7 @@ export default function SiteSettingsPage() {
             />
           </div>
           <div className="field">
-            <label className="label">Build context</label>
+            <label className="label">{t("siteSettings.buildContext")}</label>
             <input
               className="input"
               value={buildContext}
@@ -182,9 +184,7 @@ export default function SiteSettingsPage() {
         {site?.site_type === "web" && (
           <>
             <div className="field">
-              <label className="label">
-                Container port (EXPOSE in Dockerfile, e.g. 80 for nginx)
-              </label>
+              <label className="label">{t("siteSettings.containerPort")}</label>
               <input
                 className="input"
                 type="number"
@@ -193,7 +193,7 @@ export default function SiteSettingsPage() {
               />
             </div>
             <div className="field">
-              <label className="label">Domain aliases</label>
+              <label className="label">{t("siteSettings.domainAliases")}</label>
               <textarea
                 className="textarea"
                 value={aliases}
@@ -206,7 +206,7 @@ export default function SiteSettingsPage() {
                 checked={nginxSsl}
                 onChange={(e) => setNginxSsl(e.target.checked)}
               />
-              SSL enabled
+              {t("siteSettings.sslEnabled")}
             </label>
             <label style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
               <input
@@ -214,24 +214,26 @@ export default function SiteSettingsPage() {
                 checked={nginxHttps}
                 onChange={(e) => setNginxHttps(e.target.checked)}
               />
-              Force HTTPS
+              {t("siteSettings.forceHttps")}
             </label>
           </>
         )}
         {site?.site_type === "telegram_bot" && (
           <p style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
-            Telegram bot — no nginx or ports. Use secrets for BOT_TOKEN.
+            {t("siteSettings.telegramBotHint")}
           </p>
         )}
 
-        <h3>Docker volumes</h3>
+        <h3>{t("siteSettings.dockerVolumes")}</h3>
         <p style={{ color: "var(--muted)", fontSize: "0.875rem", marginBottom: "0.75rem" }}>
-          Compose-style persistence. Named volumes are prefixed with{" "}
-          <code>dockpilot-&lt;slug&gt;-</code> on the host (e.g.{" "}
-          <code>dict-data:/data</code> → <code>dockpilot-my-site-dict-data</code>).
+          {t("siteSettings.volumesHint", {
+            prefix: "dockpilot-<slug>-",
+            example: "dict-data:/data",
+            result: "dockpilot-my-site-dict-data",
+          })}
         </p>
         <div className="field">
-          <label className="label">Volume mounts (service volumes)</label>
+          <label className="label">{t("siteSettings.volumeMounts")}</label>
           <textarea
             className="textarea"
             placeholder={"dict-data:/data\n/host/cache:/cache:ro"}
@@ -241,10 +243,10 @@ export default function SiteSettingsPage() {
           />
         </div>
         <div className="field">
-          <label className="label">Named volumes (top-level volumes:)</label>
+          <label className="label">{t("siteSettings.namedVolumes")}</label>
           <textarea
             className="textarea"
-            placeholder={"dict-data"}
+            placeholder="dict-data"
             value={namedVolumes}
             onChange={(e) => setNamedVolumes(e.target.value)}
             rows={2}
@@ -258,17 +260,12 @@ export default function SiteSettingsPage() {
             onChange={(e) => setDockerNetworkHost(e.target.checked)}
             style={{ marginTop: "0.2rem" }}
           />
-          <span>
-            <strong>Host network</strong> (<code>network_mode: host</code>) — no Docker port
-            mapping; app listens on container port directly on the VPS. Nginx uses that port
-            on <code>127.0.0.1</code>.
-          </span>
+          <span>{t("siteSettings.hostNetworkLabel")}</span>
         </label>
 
-        <h3>Environment variables</h3>
+        <h3>{t("siteSettings.environmentVariables")}</h3>
         <p style={{ color: "var(--muted)", fontSize: "0.875rem", marginBottom: "0.75rem" }}>
-          Saved separately from Docker/nginx fields below — editing env vars marks this
-          section dirty; other settings saves will not touch them.
+          {t("siteSettings.envVarsHint")}
         </p>
         <EnvVarList
           envVars={envVars}
@@ -279,7 +276,7 @@ export default function SiteSettingsPage() {
         />
 
         <button type="submit" className="btn" disabled={saving}>
-          {saving ? "Saving…" : "Save settings"}
+          {saving ? t("common.saving") : t("siteSettings.saveSettings")}
         </button>
       </form>
     </div>

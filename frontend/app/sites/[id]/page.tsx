@@ -9,11 +9,13 @@ import { SiteHealthPanel } from "@/components/SiteHealthPanel";
 import { SiteTabs } from "@/components/SiteTabs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, ApiError } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 import type { Deployment, Site } from "@/lib/types";
 
 export default function SiteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useI18n();
   const [site, setSite] = useState<Site | null>(null);
   const [latestDep, setLatestDep] = useState<Deployment | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,9 +31,9 @@ export default function SiteDetailPage() {
       setLatestDep(deps[0] ?? null);
       setError(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to load site");
+      setError(e instanceof ApiError ? e.message : t("site.loadFailed"));
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     load();
@@ -44,20 +46,20 @@ export default function SiteDetailPage() {
       setLatestDep(dep);
       setError(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Deploy failed");
+      setError(e instanceof ApiError ? e.message : t("site.deployFailed"));
     } finally {
       setDeploying(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Delete this site and all related data?")) return;
+    if (!confirm(t("site.deleteConfirm"))) return;
     await api.deleteSite(id);
     router.push("/sites");
   };
 
   if (!site && !error) {
-    return <p style={{ color: "var(--muted)" }}>Loading…</p>;
+    return <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>;
   }
 
   if (error && !site) {
@@ -65,6 +67,9 @@ export default function SiteDetailPage() {
   }
 
   if (!site) return null;
+
+  const typeLabel =
+    site.site_type === "telegram_bot" ? t("sites.typeTelegramBot") : t("sites.typeWebsite");
 
   return (
     <div>
@@ -79,9 +84,7 @@ export default function SiteDetailPage() {
         <div>
           <h1>{site.name}</h1>
           <p style={{ color: "var(--muted)", margin: 0 }}>
-            {site.site_type === "telegram_bot"
-              ? "Telegram bot"
-              : site.primary_url}{" "}
+            {site.site_type === "telegram_bot" ? typeLabel : site.primary_url}{" "}
             · <StatusBadge status={site.status} />
           </p>
         </div>
@@ -92,14 +95,14 @@ export default function SiteDetailPage() {
             onClick={handleDeploy}
             disabled={deploying}
           >
-            {deploying ? "Starting…" : "Deploy"}
+            {deploying ? t("site.starting") : t("site.deploy")}
           </button>
           <button
             type="button"
             className="btn btn-danger"
             onClick={handleDelete}
           >
-            Delete
+            {t("common.delete")}
           </button>
         </div>
       </div>
@@ -112,43 +115,43 @@ export default function SiteDetailPage() {
 
       <div className="grid-2" style={{ marginTop: "1.5rem" }}>
         <div className="card">
-          <h3>Configuration</h3>
+          <h3>{t("site.configuration")}</h3>
           <dl>
-            <Info label="Type" value={site.site_type === "telegram_bot" ? "Telegram bot" : "Website"} />
-            <Info label="Slug" value={site.slug} />
-            <Info label="Git" value={site.git_repo_url} />
-            <Info label="Branch" value={site.git_branch} />
+            <Info label={t("common.type")} value={typeLabel} />
+            <Info label={t("site.slug")} value={site.slug} />
+            <Info label={t("site.git")} value={site.git_repo_url} />
+            <Info label={t("site.branch")} value={site.git_branch} />
             {site.site_type === "web" && (
               <>
                 <Info
-                  label="Docker"
+                  label={t("site.docker")}
                   value={`${site.dockerfile_path} → :${site.container_port}`}
                 />
                 <Info
-                  label="Host port"
+                  label={t("site.hostPort")}
                   value={
                     site.docker_network_host
-                      ? "host network"
+                      ? t("site.hostNetwork")
                       : site.host_port
                         ? String(site.host_port)
-                        : "—"
+                        : t("common.emDash")
                   }
                 />
               </>
             )}
             {site.site_type === "telegram_bot" && (
-              <Info label="Dockerfile" value={site.dockerfile_path} />
+              <Info label={t("site.dockerfile")} value={site.dockerfile_path} />
             )}
           </dl>
         </div>
         {site.site_type === "web" && (
           <div className="card">
-            <h3>Domains</h3>
+            <h3>{t("site.domains")}</h3>
             <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
               {site.domains.map((d) => (
                 <li key={d.id ?? d.domain}>
                   {d.domain}
-                  {d.is_primary ? " (primary)" : ""}
+                  {d.is_primary ? ` ${t("common.primary")}` : ""}
                 </li>
               ))}
             </ul>
@@ -156,22 +159,23 @@ export default function SiteDetailPage() {
               href={`/sites/${id}/settings`}
               style={{ fontSize: "0.875rem", marginTop: "0.75rem", display: "inline-block" }}
             >
-              Edit settings →
+              {t("site.editSettings")}
             </Link>
           </div>
         )}
         {site.site_type === "telegram_bot" && (
           <div className="card">
-            <h3>Bot</h3>
+            <h3>{t("site.bot")}</h3>
             <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.875rem" }}>
-              Long polling — no public URL. Token in{" "}
-              <Link href={`/sites/${id}/secrets`}>secrets</Link> (e.g. BOT_TOKEN).
+              {t("site.botHintBefore")}{" "}
+              <Link href={`/sites/${id}/secrets`}>{t("site.secretsLink")}</Link>{" "}
+              {t("site.botHintAfter")}
             </p>
             <Link
               href={`/sites/${id}/settings`}
               style={{ fontSize: "0.875rem", marginTop: "0.75rem", display: "inline-block" }}
             >
-              Edit settings →
+              {t("site.editSettings")}
             </Link>
           </div>
         )}
@@ -187,13 +191,13 @@ export default function SiteDetailPage() {
               marginBottom: "0.75rem",
             }}
           >
-            <h3 style={{ margin: 0 }}>Container logs</h3>
+            <h3 style={{ margin: 0 }}>{t("site.containerLogs")}</h3>
             <Link href={`/sites/${id}/logs`} style={{ fontSize: "0.875rem" }}>
-              Open in Logs tab →
+              {t("site.openLogsTab")}
             </Link>
           </div>
           <p style={{ color: "var(--muted)", fontSize: "0.875rem", margin: "0 0 0.75rem" }}>
-            stdout / stderr from the bot container (live).
+            {t("site.containerLogsHint")}
           </p>
           <ContainerLogStream siteId={id} />
         </div>
@@ -202,7 +206,7 @@ export default function SiteDetailPage() {
       {site.site_type === "web" && (
         <p style={{ marginTop: "1.5rem" }}>
           <Link href={`/sites/${id}/logs`} style={{ fontSize: "0.875rem" }}>
-            Container logs (stdout / stderr) →
+            {t("site.containerLogsLink")}
           </Link>
         </p>
       )}
@@ -216,8 +220,8 @@ export default function SiteDetailPage() {
               alignItems: "center",
             }}
           >
-            <h3 style={{ margin: 0 }}>Latest deployment</h3>
-            <Link href={`/sites/${id}/deployments`}>All deployments →</Link>
+            <h3 style={{ margin: 0 }}>{t("site.latestDeployment")}</h3>
+            <Link href={`/sites/${id}/deployments`}>{t("site.allDeployments")}</Link>
           </div>
           <p style={{ margin: "0.5rem 0" }}>
             <StatusBadge status={latestDep.status} /> {latestDep.message}

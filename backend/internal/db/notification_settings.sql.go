@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const notificationSettingsColumns = `id, enabled, telegram_chat_id, telegram_http_proxy, daily_digest_enabled, daily_digest_hour, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at`
+const notificationSettingsColumns = `id, enabled, telegram_chat_id, telegram_http_proxy, daily_digest_enabled, daily_digest_hour, daily_digest_timezone, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at`
 
 const ensureNotificationSettings = `-- name: EnsureNotificationSettings :one
 INSERT INTO notification_settings (id) VALUES (1)
@@ -38,6 +38,7 @@ func scanNotificationSettings(row interface {
 		&i.TelegramHttpProxy,
 		&i.DailyDigestEnabled,
 		&i.DailyDigestHour,
+		&i.DailyDigestTimezone,
 		&i.AlertOnIncidentEnabled,
 		&i.EncryptedTelegramBotToken,
 		&i.LastDailySentAt,
@@ -59,7 +60,8 @@ UPDATE notification_settings SET
     telegram_http_proxy = $3,
     daily_digest_enabled = $4,
     daily_digest_hour = $5,
-    alert_on_incident_enabled = $6,
+    daily_digest_timezone = $6,
+    alert_on_incident_enabled = $7,
     updated_at = now()
 WHERE id = 1
 RETURNING ` + notificationSettingsColumns
@@ -70,6 +72,7 @@ type UpdateNotificationSettingsParams struct {
 	TelegramHttpProxy      string `json:"telegram_http_proxy"`
 	DailyDigestEnabled     bool   `json:"daily_digest_enabled"`
 	DailyDigestHour        int32  `json:"daily_digest_hour"`
+	DailyDigestTimezone    string `json:"daily_digest_timezone"`
 	AlertOnIncidentEnabled bool   `json:"alert_on_incident_enabled"`
 }
 
@@ -80,6 +83,7 @@ func (q *Queries) UpdateNotificationSettings(ctx context.Context, arg UpdateNoti
 		arg.TelegramHttpProxy,
 		arg.DailyDigestEnabled,
 		arg.DailyDigestHour,
+		arg.DailyDigestTimezone,
 		arg.AlertOnIncidentEnabled,
 	)
 	return scanNotificationSettings(row)

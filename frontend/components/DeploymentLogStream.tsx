@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 import type { DeploymentLog } from "@/lib/types";
 
 export function DeploymentLogStream({
@@ -11,6 +12,7 @@ export function DeploymentLogStream({
   deploymentId: string;
   initialStatus?: string;
 }) {
+  const { t, formatTime } = useI18n();
   const [logs, setLogs] = useState<DeploymentLog[]>([]);
   const [status, setStatus] = useState(initialStatus ?? "pending");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -49,18 +51,29 @@ export function DeploymentLogStream({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
+  const statusKey = status.toLowerCase();
+  const statusLabel =
+    statusKey === "active" ||
+    statusKey === "pending" ||
+    statusKey === "running" ||
+    statusKey === "succeeded" ||
+    statusKey === "failed" ||
+    statusKey === "cancelled"
+      ? t(`status.${statusKey}`)
+      : status;
+
   return (
     <div>
       <p style={{ marginBottom: "0.75rem" }}>
-        Status: <strong>{status}</strong>
+        {t("logs.status")}: <strong>{statusLabel}</strong>
       </p>
       <div className="log-viewer">
         {logs.length === 0 && (
-          <span style={{ color: "var(--muted)" }}>Waiting for logs…</span>
+          <span style={{ color: "var(--muted)" }}>{t("logs.waitingDeployment")}</span>
         )}
         {logs.map((log) => (
           <div key={log.id} className={`log-line-${log.level}`}>
-            [{new Date(log.created_at).toLocaleTimeString()}] {log.message}
+            [{formatTime(log.created_at)}] {log.message}
           </div>
         ))}
         <div ref={bottomRef} />

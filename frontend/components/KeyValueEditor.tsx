@@ -1,11 +1,11 @@
 "use client";
 
 import type { EnvVar } from "@/lib/types";
+import { useI18n } from "@/lib/i18n/context";
 
 type Props = {
   rows: EnvVar[];
   onChange: (rows: EnvVar[]) => void;
-  /** password for secrets, text for env vars */
   valueInputType?: "text" | "password";
   keyPlaceholder?: string;
   valuePlaceholder?: string;
@@ -19,9 +19,12 @@ export function KeyValueEditor({
   valueInputType = "text",
   keyPlaceholder = "NAME",
   valuePlaceholder = "value",
-  addLabel = "Add row",
+  addLabel,
   showRemove = true,
 }: Props) {
+  const { t } = useI18n();
+  const resolvedAddLabel = addLabel ?? t("kvEditor.addRow");
+
   const setAt = (index: number, patch: Partial<EnvVar>) => {
     const next = [...rows];
     next[index] = { ...next[index], ...patch };
@@ -42,16 +45,16 @@ export function KeyValueEditor({
         </colgroup>
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Value</th>
-            {showRemove && <th aria-label="Actions" />}
+            <th>{t("kvEditor.name")}</th>
+            <th>{t("kvEditor.value")}</th>
+            {showRemove && <th aria-label={t("common.actions")} />}
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
               <td colSpan={showRemove ? 3 : 2} style={{ color: "var(--muted)" }}>
-                No entries — click &quot;{addLabel}&quot; below.
+                {t("kvEditor.empty", { addLabel: resolvedAddLabel })}
               </td>
             </tr>
           ) : (
@@ -64,7 +67,7 @@ export function KeyValueEditor({
                     value={row.key}
                     onChange={(e) => setAt(i, { key: e.target.value })}
                     autoComplete="off"
-                    aria-label={`Name ${i + 1}`}
+                    aria-label={t("kvEditor.nameN", { n: i + 1 })}
                   />
                 </td>
                 <td>
@@ -75,7 +78,7 @@ export function KeyValueEditor({
                     value={row.value}
                     onChange={(e) => setAt(i, { value: e.target.value })}
                     autoComplete="off"
-                    aria-label={`Value ${i + 1}`}
+                    aria-label={t("kvEditor.valueN", { n: i + 1 })}
                   />
                 </td>
                 {showRemove && (
@@ -84,7 +87,7 @@ export function KeyValueEditor({
                       type="button"
                       className="btn btn-secondary kv-remove"
                       onClick={() => removeAt(i)}
-                      aria-label={`Remove row ${i + 1}`}
+                      aria-label={t("kvEditor.removeRow", { n: i + 1 })}
                     >
                       ×
                     </button>
@@ -100,7 +103,7 @@ export function KeyValueEditor({
         className="btn btn-secondary"
         onClick={() => onChange([...rows, { key: "", value: "" }])}
       >
-        {addLabel}
+        {resolvedAddLabel}
       </button>
     </div>
   );

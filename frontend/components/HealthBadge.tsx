@@ -1,14 +1,13 @@
+"use client";
+
+import { useI18n } from "@/lib/i18n/context";
+
 export type HealthOverall = "healthy" | "degraded" | "unhealthy" | "unknown";
 
-const labels: Record<HealthOverall, string> = {
-  healthy: "Healthy",
-  degraded: "Degraded",
-  unhealthy: "Unhealthy",
-  unknown: "Unknown",
-};
-
 export function HealthBadge({ overall }: { overall: string }) {
+  const { t } = useI18n();
   const key = (overall?.toLowerCase() || "unknown") as HealthOverall;
-  const cls = `badge badge-health-${key in labels ? key : "unknown"}`;
-  return <span className={cls}>{labels[key in labels ? key : "unknown"]}</span>;
+  const known: HealthOverall[] = ["healthy", "degraded", "unhealthy", "unknown"];
+  const safe = known.includes(key) ? key : "unknown";
+  return <span className={`badge badge-health-${safe}`}>{t(`health.${safe}`)}</span>;
 }

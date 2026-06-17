@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 import type { ContainerLogLine } from "@/lib/types";
 
 export function ContainerLogStream({ siteId }: { siteId: string }) {
+  const { t } = useI18n();
   const [logs, setLogs] = useState<ContainerLogLine[]>([]);
   const [meta, setMeta] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export function ContainerLogStream({ siteId }: { siteId: string }) {
           state?: string;
         };
         if (data.container) {
-          setMeta(`${data.container} (${data.state || "—"})`);
+          setMeta(`${data.container} (${data.state || t("common.emDash")})`);
         }
       } catch {
         /* ignore */
@@ -46,9 +48,9 @@ export function ContainerLogStream({ siteId }: { siteId: string }) {
     es.addEventListener("notice", (ev) => {
       try {
         const data = JSON.parse((ev as MessageEvent).data) as { message?: string };
-        setError(data.message || "No container logs");
+        setError(data.message || t("logs.noContainerLogs"));
       } catch {
-        setError("No container logs");
+        setError(t("logs.noContainerLogs"));
       }
       es.close();
     });
@@ -56,7 +58,7 @@ export function ContainerLogStream({ siteId }: { siteId: string }) {
     es.onerror = () => es.close();
 
     return () => es.close();
-  }, [siteId]);
+  }, [siteId, t]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -66,7 +68,7 @@ export function ContainerLogStream({ siteId }: { siteId: string }) {
     <div>
       {meta && (
         <p style={{ margin: "0 0 0.5rem", color: "var(--muted)", fontSize: "0.8rem" }}>
-          Container: {meta}
+          {t("logs.container")}: {meta}
         </p>
       )}
       {error && (
@@ -76,7 +78,7 @@ export function ContainerLogStream({ siteId }: { siteId: string }) {
       )}
       <div className="log-viewer">
         {logs.length === 0 && !error && (
-          <span style={{ color: "var(--muted)" }}>Waiting for container output…</span>
+          <span style={{ color: "var(--muted)" }}>{t("logs.waitingContainer")}</span>
         )}
         {logs.map((log) => (
           <div

@@ -13,7 +13,8 @@ UPDATE notification_settings SET
     telegram_http_proxy = $3,
     daily_digest_enabled = $4,
     daily_digest_hour = $5,
-    alert_on_incident_enabled = $6,
+    daily_digest_timezone = $6,
+    alert_on_incident_enabled = $7,
     updated_at = now()
 WHERE id = 1
 RETURNING *;

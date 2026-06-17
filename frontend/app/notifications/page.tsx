@@ -2,9 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { browserTimezone } from "@/lib/timezone";
+import { useI18n } from "@/lib/i18n/context";
 import type { NotificationSettings, UpdateNotificationSettings } from "@/lib/types";
 
+function resolveDigestTimezone(stored?: string): string {
+  const tz = stored?.trim();
+  if (!tz || tz === "UTC") return browserTimezone();
+  return tz;
+}
+
 export default function NotificationsPage() {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -20,6 +29,7 @@ export default function NotificationsPage() {
   const [clearToken, setClearToken] = useState(false);
   const [dailyDigestEnabled, setDailyDigestEnabled] = useState(false);
   const [dailyDigestHour, setDailyDigestHour] = useState(9);
+  const [dailyDigestTimezone, setDailyDigestTimezone] = useState(() => browserTimezone());
   const [alertOnIncident, setAlertOnIncident] = useState(true);
 
   const load = useCallback(async () => {
@@ -32,14 +42,15 @@ export default function NotificationsPage() {
       setTokenSet(s.telegram_bot_token_set);
       setDailyDigestEnabled(s.daily_digest_enabled);
       setDailyDigestHour(s.daily_digest_hour);
+      setDailyDigestTimezone(resolveDigestTimezone(s.daily_digest_timezone));
       setAlertOnIncident(s.alert_on_incident_enabled);
       setTelegramBotToken("");
       setClearToken(false);
       setError(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Не удалось загрузить настройки");
+      setError(e instanceof ApiError ? e.message : t("notifications.loadFailed"));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -51,6 +62,7 @@ export default function NotificationsPage() {
     telegram_http_proxy: telegramHTTPProxy.trim(),
     daily_digest_enabled: dailyDigestEnabled,
     daily_digest_hour: dailyDigestHour,
+    daily_digest_timezone: dailyDigestTimezone,
     alert_on_incident_enabled: alertOnIncident,
     ...(telegramBotToken.trim()
       ? { telegram_bot_token: telegramBotToken.trim() }
@@ -72,7 +84,7 @@ export default function NotificationsPage() {
       setClearToken(false);
       setSaved(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Не удалось сохранить");
+      setError(err instanceof ApiError ? err.message : t("notifications.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -92,6 +104,7 @@ export default function NotificationsPage() {
           enabled !== settings.enabled ||
           dailyDigestEnabled !== settings.daily_digest_enabled ||
           dailyDigestHour !== settings.daily_digest_hour ||
+          dailyDigestTimezone !== resolveDigestTimezone(settings.daily_digest_timezone) ||
           alertOnIncident !== settings.alert_on_incident_enabled)
       ) {
         const updated = await api.updateNotificationSettings(buildPayload());
@@ -101,7 +114,7 @@ export default function NotificationsPage() {
       await api.sendNotificationTest();
       setTestOk(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Тест не удался");
+      setError(err instanceof ApiError ? err.message : t("notifications.testFailed"));
     } finally {
       setTesting(false);
     }
@@ -109,16 +122,15 @@ export default function NotificationsPage() {
 
   return (
     <div>
-      <h1>Уведомления</h1>
+      <h1>{t("notifications.title")}</h1>
       <p style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
-        Отправка статуса всех сайтов в Telegram: ежедневный отчёт и оповещение при
-        аварии (контейнер остановлен, healthcheck или HTTP не отвечает).
+        {t("notifications.subtitle")}
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}
-      {saved && <div className="alert alert-success">Сохранено</div>}
+      {saved && <div className="alert alert-success">{t("notifications.saved")}</div>}
       {testOk && (
-        <div className="alert alert-success">Тестовое сообщение отправлено в Telegram</div>
+        <div className="alert alert-success">{t("notifications.testSent")}</div>
       )}
 
       <form onSubmit={handleSave} className="card" style={{ marginTop: "1rem" }}>
@@ -129,20 +141,24 @@ export default function NotificationsPage() {
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
             />
-            <span>Включить уведомления в Telegram</span>
+            <span>{t("notifications.enable")}</span>
           </label>
         </div>
 
         <div className="field">
           <label className="label" htmlFor="telegram-token">
-            Токен бота Telegram
+            {t("notifications.botToken")}
           </label>
           <input
             id="telegram-token"
             className="input"
             type="password"
             autoComplete="off"
-            placeholder={tokenSet ? "Уже сохранён — введите новый, чтобы заменить" : "123456:ABC..."}
+            placeholder={
+              tokenSet
+                ? t("notifications.tokenPlaceholderSet")
+                : t("notifications.tokenPlaceholderNew")
+            }
             value={telegramBotToken}
             onChange={(e) => setTelegramBotToken(e.target.value)}
           />
@@ -153,14 +169,14 @@ export default function NotificationsPage() {
                 checked={clearToken}
                 onChange={(e) => setClearToken(e.target.checked)}
               />
-              <span>Удалить сохранённый токен</span>
+              <span>{t("notifications.clearToken")}</span>
             </label>
           )}
         </div>
 
         <div className="field">
           <label className="label" htmlFor="telegram-chat">
-            Chat ID
+            {t("notifications.chatId")}
           </label>
           <input
             id="telegram-chat"
@@ -171,13 +187,13 @@ export default function NotificationsPage() {
             onChange={(e) => setTelegramChatID(e.target.value)}
           />
           <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
-            ID чата или канала. Узнать можно через @userinfobot или @getidsbot.
+            {t("notifications.chatIdHint")}
           </p>
         </div>
 
         <div className="field">
           <label className="label" htmlFor="telegram-proxy">
-            HTTP-прокси для Telegram API
+            {t("notifications.proxy")}
           </label>
           <input
             id="telegram-proxy"
@@ -189,8 +205,7 @@ export default function NotificationsPage() {
             onChange={(e) => setTelegramHTTPProxy(e.target.value)}
           />
           <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
-            Нужен, если VPS не достучится до api.telegram.org (таймаут). Укажите тот же
-            SOCKS, что и для ботов на хосте, например socks5://127.0.0.1:1080.
+            {t("notifications.proxyHint")}
           </p>
         </div>
 
@@ -203,13 +218,13 @@ export default function NotificationsPage() {
               checked={dailyDigestEnabled}
               onChange={(e) => setDailyDigestEnabled(e.target.checked)}
             />
-            <span>Ежедневный отчёт о состоянии всех сервисов</span>
+            <span>{t("notifications.dailyDigest")}</span>
           </label>
         </div>
 
         <div className="field">
           <label className="label" htmlFor="digest-hour">
-            Время отчёта (UTC)
+            {t("notifications.digestHour")}
           </label>
           <select
             id="digest-hour"
@@ -220,10 +235,13 @@ export default function NotificationsPage() {
           >
             {Array.from({ length: 24 }, (_, h) => (
               <option key={h} value={h}>
-                {String(h).padStart(2, "0")}:00 UTC
+                {String(h).padStart(2, "0")}:00
               </option>
             ))}
           </select>
+          <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
+            {t("notifications.digestHourHint", { tz: dailyDigestTimezone })}
+          </p>
         </div>
 
         <div className="field">
@@ -233,13 +251,13 @@ export default function NotificationsPage() {
               checked={alertOnIncident}
               onChange={(e) => setAlertOnIncident(e.target.checked)}
             />
-            <span>Оповещать при аварии (статус unhealthy или degraded)</span>
+            <span>{t("notifications.alertOnIncident")}</span>
           </label>
         </div>
 
         <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", flexWrap: "wrap" }}>
           <button type="submit" className="btn" disabled={saving}>
-            {saving ? "Сохранение…" : "Сохранить"}
+            {saving ? t("common.saving") : t("common.save")}
           </button>
           <button
             type="button"
@@ -247,7 +265,7 @@ export default function NotificationsPage() {
             disabled={testing || !enabled}
             onClick={handleTest}
           >
-            {testing ? "Отправка…" : "Отправить тест"}
+            {testing ? t("notifications.sending") : t("notifications.sendTest")}
           </button>
         </div>
       </form>

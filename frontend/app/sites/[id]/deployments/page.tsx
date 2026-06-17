@@ -7,10 +7,12 @@ import { DeploymentLogStream } from "@/components/DeploymentLogStream";
 import { SiteTabs } from "@/components/SiteTabs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, ApiError } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 import type { Deployment, Site } from "@/lib/types";
 
 export default function SiteDeploymentsPage() {
   const { id } = useParams<{ id: string }>();
+  const { t, formatDateTime } = useI18n();
   const [site, setSite] = useState<Site | null>(null);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -28,14 +30,14 @@ export default function SiteDeploymentsPage() {
       if (!selectedId && deps[0]) setSelectedId(deps[0].id);
       setError(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to load");
+      setError(e instanceof ApiError ? e.message : t("siteDeployments.loadFailed"));
     }
-  }, [id, selectedId]);
+  }, [id, selectedId, t]);
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 3000);
-    return () => clearInterval(t);
+    const timer = setInterval(load, 3000);
+    return () => clearInterval(timer);
   }, [load]);
 
   const handleDeploy = async () => {
@@ -45,7 +47,7 @@ export default function SiteDeploymentsPage() {
       setSelectedId(dep.id);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Deploy failed");
+      setError(e instanceof ApiError ? e.message : t("site.deployFailed"));
     } finally {
       setDeploying(false);
     }
@@ -62,14 +64,14 @@ export default function SiteDeploymentsPage() {
           alignItems: "center",
         }}
       >
-        <h1>{site?.name ?? "Deployments"}</h1>
+        <h1>{site?.name ?? t("siteDeployments.title")}</h1>
         <button
           type="button"
           className="btn"
           onClick={handleDeploy}
           disabled={deploying}
         >
-          {deploying ? "Starting…" : "New deployment"}
+          {deploying ? t("site.starting") : t("siteDeployments.newDeployment")}
         </button>
       </div>
 
@@ -81,8 +83,8 @@ export default function SiteDeploymentsPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Status</th>
-                <th>Created</th>
+                <th>{t("common.status")}</th>
+                <th>{t("common.created")}</th>
               </tr>
             </thead>
             <tbody>
@@ -102,14 +104,14 @@ export default function SiteDeploymentsPage() {
                       {d.message}
                     </div>
                   </td>
-                  <td>{new Date(d.created_at).toLocaleString()}</td>
+                  <td>{formatDateTime(d.created_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           {deployments.length === 0 && (
             <p style={{ padding: "1rem", color: "var(--muted)" }}>
-              No deployments yet.
+              {t("siteDeployments.noDeployments")}
             </p>
           )}
         </div>
@@ -117,9 +119,9 @@ export default function SiteDeploymentsPage() {
         <div className="card">
           {selected ? (
             <>
-              <h3 style={{ marginTop: 0 }}>Deployment logs</h3>
+              <h3 style={{ marginTop: 0 }}>{t("siteDeployments.deploymentLogs")}</h3>
               <p style={{ fontSize: "0.875rem", color: "var(--muted)" }}>
-                ID: <code>{selected.id}</code>
+                {t("common.id")}: <code>{selected.id}</code>
               </p>
               <DeploymentLogStream
                 deploymentId={selected.id}
@@ -127,13 +129,13 @@ export default function SiteDeploymentsPage() {
               />
             </>
           ) : (
-            <p style={{ color: "var(--muted)" }}>Select a deployment.</p>
+            <p style={{ color: "var(--muted)" }}>{t("siteDeployments.selectDeployment")}</p>
           )}
         </div>
       </div>
 
       <Link href={`/sites/${id}`} style={{ marginTop: "1rem", display: "inline-block" }}>
-        ← Back to overview
+        {t("siteDeployments.backToOverview")}
       </Link>
     </div>
   );

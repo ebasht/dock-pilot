@@ -72,6 +72,7 @@ func (s *Service) UpdateSettings(ctx context.Context, req UpdateSettingsRequest)
 		TelegramHttpProxy:      strings.TrimSpace(req.TelegramHTTPProxy),
 		DailyDigestEnabled:     req.DailyDigestEnabled,
 		DailyDigestHour:        int32(req.DailyDigestHour),
+		DailyDigestTimezone:    strings.TrimSpace(req.DailyDigestTimezone),
 		AlertOnIncidentEnabled: req.AlertOnIncidentEnabled,
 	})
 	if err != nil {
@@ -118,8 +119,8 @@ func (s *Service) RunCheck(ctx context.Context) error {
 	prev := decodeOverallMap(settings.LastOverallBySite)
 	now := time.Now().UTC()
 
-	if settings.DailyDigestEnabled && shouldSendDaily(settings.LastDailySentAt, settings.DailyDigestHour, now) {
-		msg := formatDailyDigest(healthRows, names, now)
+	if settings.DailyDigestEnabled && shouldSendDaily(settings.LastDailySentAt, settings.DailyDigestHour, settings.DailyDigestTimezone, now) {
+		msg := formatDailyDigest(healthRows, names, now, settings.DailyDigestTimezone)
 		if err := s.telegram.SendMessage(ctx, token, settings.TelegramChatID, msg, settings.TelegramHttpProxy); err != nil {
 			return fmt.Errorf("daily digest: %w", err)
 		}
@@ -216,6 +217,13 @@ func validateUpdate(req UpdateSettingsRequest, current db.NotificationSettings) 
 	if req.DailyDigestHour < 0 || req.DailyDigestHour > 23 {
 		return ErrInvalidInput
 	}
+	tz := strings.TrimSpace(req.DailyDigestTimezone)
+	if tz == "" {
+		tz = "UTC"
+	}
+	if _, err := time.LoadLocation(tz); err != nil {
+		return fmt.Errorf("%w: daily_digest_timezone must be a valid IANA timezone (e.g. Europe/Moscow)", ErrInvalidInput)
+	}
 	if !req.Enabled {
 		return nil
 	}
@@ -240,6 +248,7 @@ func toSettingsResponse(row db.NotificationSettings) SettingsResponse {
 		TelegramBotTokenSet:    len(row.EncryptedTelegramBotToken) > 0,
 		DailyDigestEnabled:     row.DailyDigestEnabled,
 		DailyDigestHour:        int(row.DailyDigestHour),
+		DailyDigestTimezone:    row.DailyDigestTimezone,
 		AlertOnIncidentEnabled: row.AlertOnIncidentEnabled,
 	}
 }
@@ -253,15 +262,29 @@ func decodeOverallMap(raw []byte) map[string]string {
 	return out
 }
 
-func shouldSendDaily(last pgtype.Timestamptz, hour int32, now time.Time) bool {
-	if int(now.Hour()) != int(hour) {
+func digestLocation(tz string) *time.Location {
+	tz = strings.TrimSpace(tz)
+	if tz == "" {
+		tz = "UTC"
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
+}
+
+func shouldSendDaily(last pgtype.Timestamptz, hour int32, tz string, now time.Time) bool {
+	localNow := now.In(digestLocation(tz))
+	if localNow.Hour() != int(hour) {
 		return false
 	}
 	if !last.Valid {
 		return true
 	}
-	y1, m1, d1 := last.Time.UTC().Date()
-	y2, m2, d2 := now.Date()
+	lastLocal := last.Time.In(digestLocation(tz))
+	y1, m1, d1 := lastLocal.Date()
+	y2, m2, d2 := localNow.Date()
 	return y1 != y2 || m1 != m2 || d1 != d2
 }
 
@@ -283,9 +306,10 @@ func isIncidentTransition(prev, current string) bool {
 	return prev == "healthy"
 }
 
-func formatDailyDigest(rows []healthcheck.Result, names map[string]string, now time.Time) string {
+func formatDailyDigest(rows []healthcheck.Result, names map[string]string, now time.Time, tz string) string {
+	localNow := now.In(digestLocation(tz))
 	var b strings.Builder
-	fmt.Fprintf(&b, "<b>DockPilot — ежедневный отчёт</b>\n%s UTC\n\n", now.Format("2006-01-02 15:04"))
+	fmt.Fprintf(&b, "<b>DockPilot — ежедневный отчёт</b>\n%s\n\n", localNow.Format("2006-01-02 15:04 MST"))
 	if len(rows) == 0 {
 		b.WriteString("Нет сайтов в панели.")
 		return b.String()

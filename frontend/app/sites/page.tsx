@@ -5,10 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 import { HealthBadge } from "@/components/HealthBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, ApiError } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 import { siteUrlHref } from "@/lib/site-url";
 import type { SiteHealth, SiteListItem } from "@/lib/types";
 
 export default function SitesPage() {
+  const { t, formatDateTime } = useI18n();
   const [sites, setSites] = useState<SiteListItem[]>([]);
   const [healthBySite, setHealthBySite] = useState<Record<string, SiteHealth>>({});
   const [error, setError] = useState<string | null>(null);
@@ -32,13 +34,13 @@ export default function SitesPage() {
       .listSites()
       .then(setSites)
       .catch((e: unknown) => {
-        setError(e instanceof ApiError ? e.message : "Failed to load sites");
+        setError(e instanceof ApiError ? e.message : t("sites.loadFailed"));
       })
       .finally(() => setLoading(false));
     loadHealth();
-    const t = setInterval(loadHealth, 30_000);
-    return () => clearInterval(t);
-  }, [loadHealth]);
+    const timer = setInterval(loadHealth, 30_000);
+    return () => clearInterval(timer);
+  }, [loadHealth, t]);
 
   return (
     <div>
@@ -50,21 +52,21 @@ export default function SitesPage() {
           marginBottom: "1.5rem",
         }}
       >
-        <h1>Sites</h1>
+        <h1>{t("sites.title")}</h1>
         <Link href="/sites/new" className="btn">
-          New site
+          {t("nav.newSite")}
         </Link>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 
       {loading ? (
-        <p style={{ color: "var(--muted)" }}>Loading…</p>
+        <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>
       ) : sites.length === 0 ? (
         <div className="card">
-          <p>No sites yet. Create your first deployment target.</p>
+          <p>{t("sites.empty")}</p>
           <Link href="/sites/new" className="btn" style={{ marginTop: "1rem" }}>
-            Create site
+            {t("sites.createSite")}
           </Link>
         </div>
       ) : (
@@ -72,12 +74,12 @@ export default function SitesPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>URL</th>
-                <th>Health</th>
-                <th>Status</th>
-                <th>Updated</th>
+                <th>{t("sites.tableName")}</th>
+                <th>{t("sites.tableType")}</th>
+                <th>{t("sites.tableUrl")}</th>
+                <th>{t("sites.tableHealth")}</th>
+                <th>{t("sites.tableStatus")}</th>
+                <th>{t("sites.tableUpdated")}</th>
               </tr>
             </thead>
             <tbody>
@@ -90,11 +92,13 @@ export default function SitesPage() {
                     </div>
                   </td>
                   <td>
-                    {site.site_type === "telegram_bot" ? "Telegram bot" : "Website"}
+                    {site.site_type === "telegram_bot"
+                      ? t("sites.typeTelegramBot")
+                      : t("sites.typeWebsite")}
                   </td>
                   <td>
                     {site.site_type === "telegram_bot" ? (
-                      "—"
+                      t("common.emDash")
                     ) : site.primary_url ? (
                       <a
                         href={siteUrlHref(site.primary_url)}
@@ -104,7 +108,7 @@ export default function SitesPage() {
                         {site.primary_url}
                       </a>
                     ) : (
-                      "—"
+                      t("common.emDash")
                     )}
                   </td>
                   <td>
@@ -121,7 +125,7 @@ export default function SitesPage() {
                   <td>
                     <StatusBadge status={site.status} />
                   </td>
-                  <td>{new Date(site.updated_at).toLocaleString()}</td>
+                  <td>{formatDateTime(site.updated_at)}</td>
                 </tr>
               ))}
             </tbody>
