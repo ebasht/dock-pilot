@@ -44,14 +44,7 @@ export default function SitesPage() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "1.5rem",
-        }}
-      >
+      <div className="page-header">
         <h1>{t("sites.title")}</h1>
         <Link href="/sites/new" className="btn">
           {t("nav.newSite")}
@@ -71,15 +64,16 @@ export default function SitesPage() {
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
                 <th>{t("sites.tableName")}</th>
-                <th>{t("sites.tableType")}</th>
+                <th className="col-hide-mobile">{t("sites.tableType")}</th>
                 <th>{t("sites.tableUrl")}</th>
                 <th>{t("sites.tableHealth")}</th>
-                <th>{t("sites.tableStatus")}</th>
-                <th>{t("sites.tableUpdated")}</th>
+                <th className="col-hide-mobile">{t("sites.tableStatus")}</th>
+                <th className="col-hide-mobile">{t("sites.tableUpdated")}</th>
               </tr>
             </thead>
             <tbody>
@@ -91,7 +85,7 @@ export default function SitesPage() {
                       {site.slug}
                     </div>
                   </td>
-                  <td>
+                  <td className="col-hide-mobile">
                     {site.site_type === "telegram_bot"
                       ? t("sites.typeTelegramBot")
                       : t("sites.typeWebsite")}
@@ -122,14 +116,15 @@ export default function SitesPage() {
                       </span>
                     )}
                   </td>
-                  <td>
+                  <td className="col-hide-mobile">
                     <StatusBadge status={site.status} />
                   </td>
-                  <td>{formatDateTime(site.updated_at)}</td>
+                  <td className="col-hide-mobile">{formatDateTime(site.updated_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

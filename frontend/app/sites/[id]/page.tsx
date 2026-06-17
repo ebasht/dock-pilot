@@ -93,22 +93,15 @@ export default function SiteDetailPage() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: "0.5rem",
-        }}
-      >
+      <div className="page-header page-header-tight">
         <div>
           <h1>{site.name}</h1>
-          <p style={{ color: "var(--muted)", margin: 0 }}>
+          <p className="page-header-meta">
             {site.site_type === "telegram_bot" ? typeLabel : site.primary_url}{" "}
             · <StatusBadge status={site.status} />
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="page-actions">
           <button
             type="button"
             className="btn"

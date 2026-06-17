@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   description: en.meta.description,
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default async function RootLayout({
   children,
 }: {

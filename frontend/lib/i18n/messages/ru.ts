@@ -34,6 +34,8 @@ export const ru: Messages = {
     notifications: "Уведомления",
     newSite: "Новый сайт",
     mobile: "Телефон",
+    menu: "Меню",
+    closeMenu: "Закрыть",
     logout: "Выйти",
     language: "Язык",
     langEn: "English",
@@ -41,6 +43,8 @@ export const ru: Messages = {
   },
   auth: {
     hint: "Введите API-токен для доступа к панели. Токен хранится только в сессии этого браузера.",
+    hintMobile:
+      "Введите API-токен или отсканируйте QR с компьютера (в меню: Телефон).",
     apiLabel: "API",
     tokenLabel: "API-токен",
     tokenPlaceholder: "Значение API_TOKEN из .env на сервере",
@@ -50,7 +54,14 @@ export const ru: Messages = {
       "Не удалось подключиться к API по адресу {apiBase}. {message}. Проверьте DNS, nginx и что контейнер API запущен.",
     checking: "Проверка…",
     showQr: "QR для телефона",
+    scanQr: "Сканировать QR",
     qrNeedsToken: "Сначала введите API-токен",
+  },
+  qrScanner: {
+    title: "Сканирование QR",
+    hint: "Наведите камеру на QR-код на экране компьютера",
+    cameraDenied: "Нет доступа к камере. Разрешите камеру в настройках браузера.",
+    invalidQr: "Это не QR для входа в DockPilot. Попробуйте снова.",
   },
   mobileQr: {
     title: "Вход с телефона",

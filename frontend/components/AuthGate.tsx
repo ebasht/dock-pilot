@@ -7,11 +7,13 @@ import {
   getApiToken,
   setApiToken,
 } from "@/lib/auth-token";
-import { getApiBase, verifyApiToken } from "@/lib/api";
+import { getApiBase, verifyApiToken, exchangeQRCode, ApiError } from "@/lib/api";
 import { BrandLogo } from "@/components/BrandLogo";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { MobileQrModal } from "@/components/MobileQrModal";
+import { MobileQrScanner } from "@/components/MobileQrScanner";
 import { useI18n } from "@/lib/i18n/context";
+import { useIsMobile } from "@/lib/use-is-mobile";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
@@ -21,7 +23,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [qrToken, setQrToken] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const [apiBase, setApiBase] = useState("");
 
@@ -102,6 +106,33 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [tokenInput, t]);
 
+  const handleScanAuth = useCallback(
+    async (code: string) => {
+      setScannerOpen(false);
+      setSubmitting(true);
+      setError(null);
+      try {
+        const token = await exchangeQRCode(code);
+        setApiToken(token);
+        setAuthed(true);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : t("mobileAuth.failed"));
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [t],
+  );
+
+  const handleQrClick = useCallback(() => {
+    if (isMobile) {
+      setError(null);
+      setScannerOpen(true);
+      return;
+    }
+    void handleShowQr();
+  }, [isMobile, handleShowQr]);
+
   if (!ready) {
     return null;
   }
@@ -115,7 +146,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           <h1 className="auth-brand">
             <BrandLogo showVersion size="auth" />
           </h1>
-          <p className="auth-hint">{t("auth.hint")}</p>
+          <p className="auth-hint">
+            {isMobile ? t("auth.hintMobile") : t("auth.hint")}
+          </p>
           <p className="auth-api-url">
             {t("auth.apiLabel")}: <code>{apiBase || getApiBase()}</code>
           </p>
@@ -143,11 +176,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 className="btn btn-secondary"
-                disabled={submitting || !tokenInput.trim()}
-                title={!tokenInput.trim() ? t("auth.qrNeedsToken") : undefined}
-                onClick={() => void handleShowQr()}
+                disabled={submitting || (!isMobile && !tokenInput.trim())}
+                title={
+                  !isMobile && !tokenInput.trim()
+                    ? t("auth.qrNeedsToken")
+                    : undefined
+                }
+                onClick={handleQrClick}
               >
-                {t("auth.showQr")}
+                {isMobile ? t("auth.scanQr") : t("auth.showQr")}
               </button>
             </div>
           </form>
@@ -160,6 +197,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             setQrToken(null);
           }}
           provisionalToken={qrToken ?? undefined}
+        />
+        <MobileQrScanner
+          open={scannerOpen}
+          onClose={() => setScannerOpen(false)}
+          onScan={handleScanAuth}
         />
       </>
     );

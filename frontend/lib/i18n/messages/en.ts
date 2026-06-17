@@ -32,6 +32,8 @@ export const en = {
     notifications: "Notifications",
     newSite: "New site",
     mobile: "Mobile",
+    menu: "Menu",
+    closeMenu: "Close",
     logout: "Log out",
     language: "Language",
     langEn: "English",
@@ -39,6 +41,8 @@ export const en = {
   },
   auth: {
     hint: "Enter the API token to access the control panel. The token is stored in this browser session only.",
+    hintMobile:
+      "Enter the API token, or scan the QR code from your computer (Menu → Mobile on desktop).",
     apiLabel: "API",
     tokenLabel: "API token",
     tokenPlaceholder: "Value from API_TOKEN in server .env",
@@ -48,7 +52,14 @@ export const en = {
       "Cannot reach API at {apiBase}. {message}. Check DNS, nginx, and that the API container is running.",
     checking: "Checking…",
     showQr: "QR for phone",
+    scanQr: "Scan QR",
     qrNeedsToken: "Enter API token first",
+  },
+  qrScanner: {
+    title: "Scan sign-in QR",
+    hint: "Point the camera at the QR code on your computer screen",
+    cameraDenied: "Camera access denied. Allow camera in browser settings.",
+    invalidQr: "Not a DockPilot sign-in QR. Try again.",
   },
   mobileQr: {
     title: "Sign in on phone",

@@ -8,16 +8,39 @@ type Props = {
 };
 
 export function BrandLogo({ showVersion = false, size = "nav" }: Props) {
+  const isNav = size === "nav";
+
   return (
     <span className={`brand-logo brand-logo-${size}`}>
-      <Image
-        src="/logo.png"
-        alt="DockPilot"
-        width={162}
-        height={108}
-        priority
-        className="brand-logo-img"
-      />
+      {isNav ? (
+        <>
+          <Image
+            src="/icon.png"
+            alt="DockPilot"
+            width={32}
+            height={32}
+            priority
+            className="brand-logo-icon"
+          />
+          <Image
+            src="/logo.png"
+            alt="DockPilot"
+            width={162}
+            height={108}
+            priority
+            className="brand-logo-img brand-logo-full"
+          />
+        </>
+      ) : (
+        <Image
+          src="/logo.png"
+          alt="DockPilot"
+          width={162}
+          height={108}
+          priority
+          className="brand-logo-img"
+        />
+      )}
       {showVersion && <AppVersion />}
     </span>
   );
