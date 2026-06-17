@@ -29,6 +29,14 @@ func TestIsIncidentTransition(t *testing.T) {
 	}
 }
 
+func TestDigestLocationAsiaBarnaul(t *testing.T) {
+	t.Parallel()
+	loc := digestLocation("Asia/Barnaul")
+	if loc.String() != "Asia/Barnaul" {
+		t.Fatalf("digestLocation(Asia/Barnaul) = %q", loc.String())
+	}
+}
+
 func TestShouldSendDaily(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 6, 15, 9, 30, 0, 0, time.UTC)
