@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
+import { useLogViewerScroll } from "@/lib/use-log-viewer-scroll";
 import type { DeploymentLog } from "@/lib/types";
 
 export function DeploymentLogStream({
@@ -15,7 +16,7 @@ export function DeploymentLogStream({
   const { t, formatTime } = useI18n();
   const [logs, setLogs] = useState<DeploymentLog[]>([]);
   const [status, setStatus] = useState(initialStatus ?? "pending");
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const es = api.streamDeploymentLogs(deploymentId);
@@ -47,9 +48,7 @@ export function DeploymentLogStream({
     return () => es.close();
   }, [deploymentId]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs]);
+  useLogViewerScroll(viewerRef, logs.length);
 
   const statusKey = status.toLowerCase();
   const statusLabel =
@@ -67,7 +66,7 @@ export function DeploymentLogStream({
       <p style={{ marginBottom: "0.75rem" }}>
         {t("logs.status")}: <strong>{statusLabel}</strong>
       </p>
-      <div className="log-viewer">
+      <div className="log-viewer" ref={viewerRef}>
         {logs.length === 0 && (
           <span style={{ color: "var(--muted)" }}>{t("logs.waitingDeployment")}</span>
         )}
@@ -76,7 +75,6 @@ export function DeploymentLogStream({
             [{formatTime(log.created_at)}] {log.message}
           </div>
         ))}
-        <div ref={bottomRef} />
       </div>
     </div>
   );

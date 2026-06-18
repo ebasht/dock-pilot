@@ -162,7 +162,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
                 className="input"
                 type="password"
                 autoComplete="off"
-                autoFocus
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
                 placeholder={t("auth.tokenPlaceholder")}

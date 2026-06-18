@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
+import { useLogViewerScroll } from "@/lib/use-log-viewer-scroll";
 import type { ContainerLogLine } from "@/lib/types";
 
 export function ContainerLogStream({ siteId }: { siteId: string }) {
@@ -10,7 +11,7 @@ export function ContainerLogStream({ siteId }: { siteId: string }) {
   const [logs, setLogs] = useState<ContainerLogLine[]>([]);
   const [meta, setMeta] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLogs([]);
@@ -60,9 +61,7 @@ export function ContainerLogStream({ siteId }: { siteId: string }) {
     return () => es.close();
   }, [siteId, t]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs]);
+  useLogViewerScroll(viewerRef, logs.length);
 
   return (
     <div>
@@ -76,7 +75,7 @@ export function ContainerLogStream({ siteId }: { siteId: string }) {
           {error}
         </p>
       )}
-      <div className="log-viewer">
+      <div className="log-viewer" ref={viewerRef}>
         {logs.length === 0 && !error && (
           <span style={{ color: "var(--muted)" }}>{t("logs.waitingContainer")}</span>
         )}
@@ -88,7 +87,6 @@ export function ContainerLogStream({ siteId }: { siteId: string }) {
             {log.line}
           </div>
         ))}
-        <div ref={bottomRef} />
       </div>
     </div>
   );

@@ -230,29 +230,28 @@ h3 {
   gap: 0.5rem;
 }
 
-.brand-logo-small {
-  display: none;
-  height: 36px;
+.brand-logo-small,
+.brand-logo-full {
   width: auto;
-  max-width: 48px;
   flex-shrink: 0;
   object-fit: contain;
 }
 
-.brand-logo-img {
-  display: block;
-  width: auto;
+.brand-logo-img.brand-logo-small {
+  display: none;
   height: 36px;
-  object-fit: contain;
+  max-width: 52px;
 }
 
-.brand-logo-full {
-  max-width: min(220px, 50vw);
+.brand-logo-img.brand-logo-full {
+  display: block;
+  height: 44px;
+  max-width: min(260px, 50vw);
 }
 
-.brand-logo-auth .brand-logo-img {
-  height: 48px;
-  max-width: min(280px, 85vw);
+.brand-logo-auth .brand-logo-img.brand-logo-full {
+  height: 56px;
+  max-width: min(320px, 85vw);
 }
 
 .auth-brand {
@@ -708,16 +707,22 @@ h3 {
     font-size: 1.35rem;
   }
 
-  .brand-logo-small {
+  .brand-logo-img.brand-logo-small {
     display: block;
+    height: 48px;
+    max-width: 72px;
   }
 
-  .brand-logo-full {
+  .brand-logo-img.brand-logo-full {
     display: none;
   }
 
+  .brand-logo-auth .brand-logo-img.brand-logo-full {
+    height: 64px;
+  }
+
   .brand-logo .app-version {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
   }
 
   .nav-toggle {

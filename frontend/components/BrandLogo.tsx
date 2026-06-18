@@ -38,7 +38,7 @@ export function BrandLogo({ showVersion = false, size = "nav" }: Props) {
           width={1024}
           height={682}
           priority
-          className="brand-logo-img"
+          className="brand-logo-img brand-logo-full"
         />
       )}
       {showVersion && <AppVersion />}
