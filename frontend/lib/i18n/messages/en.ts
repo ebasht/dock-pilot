@@ -40,7 +40,7 @@ export const en = {
     langRu: "Русский",
   },
   auth: {
-    hint: "Enter the API token to access the control panel. The token is stored in this browser session only.",
+    hint: "Enter the API token to access the control panel. The token is stored on this device until you log out.",
     hintMobile:
       "Enter the API token, or scan the QR code from your computer (Menu → Mobile on desktop).",
     apiLabel: "API",

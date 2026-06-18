@@ -57,7 +57,7 @@ postgres://dockpilot:dockpilot@localhost:5432/dockpilot?sslmode=disable
 ### Авторизация
 
 - **Backend:** `API_TOKEN` в `.env` (минимум 16 символов), все `/api/*` требуют `Authorization: Bearer <token>`
-- **Frontend:** при открытии UI запрашивается тот же токен; сохраняется в `sessionStorage` до закрытия вкладки
+- **Frontend:** при открытии UI запрашивается тот же токен; сохраняется в `localStorage` до выхода
 - **CORS:** в `.env` API задайте `CORS_ALLOWED_ORIGINS` — URL, с которого открываете UI (с портом), например `http://77.238.238.224:3001`
 - SSE-логи: `?token=...` в URL
 

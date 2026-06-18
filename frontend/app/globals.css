@@ -230,27 +230,29 @@ h3 {
   gap: 0.5rem;
 }
 
-.brand-logo-icon {
+.brand-logo-small {
   display: none;
-  width: 32px;
-  height: 32px;
+  height: 36px;
+  width: auto;
+  max-width: 48px;
   flex-shrink: 0;
+  object-fit: contain;
 }
 
 .brand-logo-img {
   display: block;
   width: auto;
   height: 36px;
-  max-width: min(180px, 42vw);
-}
-
-.brand-logo-full {
   object-fit: contain;
 }
 
+.brand-logo-full {
+  max-width: min(220px, 50vw);
+}
+
 .brand-logo-auth .brand-logo-img {
-  height: 44px;
-  max-width: min(220px, 80vw);
+  height: 48px;
+  max-width: min(280px, 85vw);
 }
 
 .auth-brand {
@@ -706,7 +708,7 @@ h3 {
     font-size: 1.35rem;
   }
 
-  .brand-logo-icon {
+  .brand-logo-small {
     display: block;
   }
 

@@ -15,28 +15,28 @@ export function BrandLogo({ showVersion = false, size = "nav" }: Props) {
       {isNav ? (
         <>
           <Image
-            src="/icon.png"
+            src="/logo-small.png"
             alt="DockPilot"
-            width={32}
-            height={32}
+            width={1024}
+            height={682}
             priority
-            className="brand-logo-icon"
+            className="brand-logo-img brand-logo-small"
           />
           <Image
-            src="/logo.png"
+            src="/logo-full.png"
             alt="DockPilot"
-            width={162}
-            height={108}
+            width={1024}
+            height={682}
             priority
             className="brand-logo-img brand-logo-full"
           />
         </>
       ) : (
         <Image
-          src="/logo.png"
+          src="/logo-full.png"
           alt="DockPilot"
-          width={162}
-          height={108}
+          width={1024}
+          height={682}
           priority
           className="brand-logo-img"
         />
