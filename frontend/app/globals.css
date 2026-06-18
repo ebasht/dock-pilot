@@ -698,6 +698,28 @@ h3 {
   margin-bottom: 0.5rem;
 }
 
+.confirm-dialog h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+}
+
+.confirm-dialog-message {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0 0 1.25rem;
+  line-height: 1.5;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.confirm-dialog-actions .btn {
+  min-width: 5.5rem;
+}
+
 @media (max-width: 768px) {
   main {
     padding: 1rem 0.75rem 3rem;
