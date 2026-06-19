@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -26,31 +25,20 @@ func (q *Queries) ClearNotificationToken(ctx context.Context) error {
 const ensureNotificationSettings = `-- name: EnsureNotificationSettings :one
 INSERT INTO notification_settings (id) VALUES (1)
 ON CONFLICT (id) DO UPDATE SET updated_at = notification_settings.updated_at
-RETURNING id, enabled, telegram_chat_id, daily_digest_enabled, daily_digest_hour, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at
+RETURNING id, enabled, telegram_chat_id, telegram_http_proxy, daily_digest_enabled, daily_digest_hour, daily_digest_timezone, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at
 `
 
-type EnsureNotificationSettingsRow struct {
-	ID                        int32              `json:"id"`
-	Enabled                   bool               `json:"enabled"`
-	TelegramChatID            string             `json:"telegram_chat_id"`
-	DailyDigestEnabled        bool               `json:"daily_digest_enabled"`
-	DailyDigestHour           int32              `json:"daily_digest_hour"`
-	AlertOnIncidentEnabled    bool               `json:"alert_on_incident_enabled"`
-	EncryptedTelegramBotToken []byte             `json:"encrypted_telegram_bot_token"`
-	LastDailySentAt           pgtype.Timestamptz `json:"last_daily_sent_at"`
-	LastOverallBySite         []byte             `json:"last_overall_by_site"`
-	UpdatedAt                 time.Time          `json:"updated_at"`
-}
-
-func (q *Queries) EnsureNotificationSettings(ctx context.Context) (EnsureNotificationSettingsRow, error) {
+func (q *Queries) EnsureNotificationSettings(ctx context.Context) (NotificationSetting, error) {
 	row := q.db.QueryRow(ctx, ensureNotificationSettings)
-	var i EnsureNotificationSettingsRow
+	var i NotificationSetting
 	err := row.Scan(
 		&i.ID,
 		&i.Enabled,
 		&i.TelegramChatID,
+		&i.TelegramHttpProxy,
 		&i.DailyDigestEnabled,
 		&i.DailyDigestHour,
+		&i.DailyDigestTimezone,
 		&i.AlertOnIncidentEnabled,
 		&i.EncryptedTelegramBotToken,
 		&i.LastDailySentAt,

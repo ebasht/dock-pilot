@@ -157,10 +157,10 @@ func (s *Service) RunCheck(ctx context.Context) error {
 	return s.queries.UpdateNotificationLastOverall(ctx, raw)
 }
 
-func (s *Service) loadTelegramConfig(ctx context.Context) (db.NotificationSettings, string, error) {
+func (s *Service) loadTelegramConfig(ctx context.Context) (db.NotificationSetting, string, error) {
 	row, err := s.queries.GetNotificationSettings(ctx)
 	if err != nil {
-		return db.NotificationSettings{}, "", err
+		return db.NotificationSetting{}, "", err
 	}
 	if !row.Enabled {
 		return row, "", ErrNotConfigured
@@ -178,23 +178,23 @@ func (s *Service) loadTelegramConfig(ctx context.Context) (db.NotificationSettin
 	return row, token, nil
 }
 
-func (s *Service) getSettingsRow(ctx context.Context) (db.NotificationSettings, error) {
+func (s *Service) getSettingsRow(ctx context.Context) (db.NotificationSetting, error) {
 	row, err := s.queries.GetNotificationSettings(ctx)
 	if err == nil {
 		return row, nil
 	}
 	if mapped := mapDBErr(err); mapped != nil {
-		return db.NotificationSettings{}, mapped
+		return db.NotificationSetting{}, mapped
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return db.NotificationSettings{}, err
+		return db.NotificationSetting{}, err
 	}
 	row, err = s.queries.EnsureNotificationSettings(ctx)
 	if err != nil {
 		if mapped := mapDBErr(err); mapped != nil {
-			return db.NotificationSettings{}, mapped
+			return db.NotificationSetting{}, mapped
 		}
-		return db.NotificationSettings{}, err
+		return db.NotificationSetting{}, err
 	}
 	return row, nil
 }
@@ -210,7 +210,7 @@ func mapDBErr(err error) error {
 	return nil
 }
 
-func validateUpdate(req UpdateSettingsRequest, current db.NotificationSettings) error {
+func validateUpdate(req UpdateSettingsRequest, current db.NotificationSetting) error {
 	if err := validateProxyURL(req.TelegramHTTPProxy); err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ func validateUpdate(req UpdateSettingsRequest, current db.NotificationSettings) 
 	return nil
 }
 
-func toSettingsResponse(row db.NotificationSettings) SettingsResponse {
+func toSettingsResponse(row db.NotificationSetting) SettingsResponse {
 	return SettingsResponse{
 		Enabled:                row.Enabled,
 		TelegramChatID:         row.TelegramChatID,
