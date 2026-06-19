@@ -7,7 +7,7 @@
 set -euo pipefail
 
 ROOT="${DOCK_PILOT_INSTALL_DIR:-/opt/dock-pilot}"
-GITHUB_REPO="${DOCK_PILOT_GITHUB_REPO:-e-bashtan/dock-pilot}"
+GITHUB_REPO="${DOCK_PILOT_GITHUB_REPO:-ebasht/dock-pilot}"
 VERSION="${1:-latest}"
 
 log() { echo "[dock-pilot] $*"; }

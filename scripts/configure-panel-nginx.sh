@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-GITHUB_REPO="${DOCK_PILOT_GITHUB_REPO:-e-bashtan/dock-pilot}"
+GITHUB_REPO="${DOCK_PILOT_GITHUB_REPO:-ebasht/dock-pilot}"
 SKIP_CERT=0
 
 while [[ $# -gt 0 ]]; do

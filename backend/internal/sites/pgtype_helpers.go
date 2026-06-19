@@ -24,3 +24,10 @@ func boolOpt(v *bool) pgtype.Bool {
 	}
 	return pgtype.Bool{Bool: *v, Valid: true}
 }
+
+func healthCheckPathPtr(s *string) pgtype.Text {
+	if s == nil {
+		return pgtype.Text{Valid: false}
+	}
+	return pgtype.Text{String: NormalizeHealthCheckPath(*s), Valid: true}
+}

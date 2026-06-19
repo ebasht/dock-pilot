@@ -17,10 +17,11 @@ INSERT INTO sites (
     name, slug, primary_url, git_repo_url, git_branch,
     dockerfile_path, build_context, container_port, host_port,
     nginx_ssl_enabled, nginx_force_https, site_type,
-    docker_volume_mounts, docker_named_volumes, docker_network_host, status
+    docker_volume_mounts, docker_named_volumes, docker_network_host,
+    health_check_path, status
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
-) RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+) RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, health_check_path, status, created_at, updated_at
 `
 
 type CreateSiteParams struct {
@@ -39,6 +40,7 @@ type CreateSiteParams struct {
 	DockerVolumeMounts string      `json:"docker_volume_mounts"`
 	DockerNamedVolumes string      `json:"docker_named_volumes"`
 	DockerNetworkHost  bool        `json:"docker_network_host"`
+	HealthCheckPath    string      `json:"health_check_path"`
 	Status             string      `json:"status"`
 }
 
@@ -59,6 +61,7 @@ func (q *Queries) CreateSite(ctx context.Context, arg CreateSiteParams) (Site, e
 		arg.DockerVolumeMounts,
 		arg.DockerNamedVolumes,
 		arg.DockerNetworkHost,
+		arg.HealthCheckPath,
 		arg.Status,
 	)
 	var i Site
@@ -79,6 +82,7 @@ func (q *Queries) CreateSite(ctx context.Context, arg CreateSiteParams) (Site, e
 		&i.DockerVolumeMounts,
 		&i.DockerNamedVolumes,
 		&i.DockerNetworkHost,
+		&i.HealthCheckPath,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -96,7 +100,7 @@ func (q *Queries) DeleteSite(ctx context.Context, id uuid.UUID) error {
 }
 
 const getSite = `-- name: GetSite :one
-SELECT id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at FROM sites WHERE id = $1
+SELECT id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, health_check_path, status, created_at, updated_at FROM sites WHERE id = $1
 `
 
 func (q *Queries) GetSite(ctx context.Context, id uuid.UUID) (Site, error) {
@@ -119,6 +123,7 @@ func (q *Queries) GetSite(ctx context.Context, id uuid.UUID) (Site, error) {
 		&i.DockerVolumeMounts,
 		&i.DockerNamedVolumes,
 		&i.DockerNetworkHost,
+		&i.HealthCheckPath,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -127,7 +132,7 @@ func (q *Queries) GetSite(ctx context.Context, id uuid.UUID) (Site, error) {
 }
 
 const getSiteBySlug = `-- name: GetSiteBySlug :one
-SELECT id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at FROM sites WHERE slug = $1
+SELECT id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, health_check_path, status, created_at, updated_at FROM sites WHERE slug = $1
 `
 
 func (q *Queries) GetSiteBySlug(ctx context.Context, slug string) (Site, error) {
@@ -150,6 +155,7 @@ func (q *Queries) GetSiteBySlug(ctx context.Context, slug string) (Site, error) 
 		&i.DockerVolumeMounts,
 		&i.DockerNamedVolumes,
 		&i.DockerNetworkHost,
+		&i.HealthCheckPath,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -158,7 +164,7 @@ func (q *Queries) GetSiteBySlug(ctx context.Context, slug string) (Site, error) 
 }
 
 const listSites = `-- name: ListSites :many
-SELECT id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at FROM sites ORDER BY created_at DESC
+SELECT id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, health_check_path, status, created_at, updated_at FROM sites ORDER BY created_at DESC
 `
 
 func (q *Queries) ListSites(ctx context.Context) ([]Site, error) {
@@ -187,6 +193,7 @@ func (q *Queries) ListSites(ctx context.Context) ([]Site, error) {
 			&i.DockerVolumeMounts,
 			&i.DockerNamedVolumes,
 			&i.DockerNetworkHost,
+			&i.HealthCheckPath,
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -217,10 +224,11 @@ UPDATE sites SET
     docker_volume_mounts = COALESCE($12, docker_volume_mounts),
     docker_named_volumes = COALESCE($13, docker_named_volumes),
     docker_network_host = COALESCE($14, docker_network_host),
-    status = COALESCE($15, status),
+    health_check_path = COALESCE($15, health_check_path),
+    status = COALESCE($16, status),
     updated_at = now()
-WHERE id = $16
-RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at
+WHERE id = $17
+RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, health_check_path, status, created_at, updated_at
 `
 
 type UpdateSiteParams struct {
@@ -238,6 +246,7 @@ type UpdateSiteParams struct {
 	DockerVolumeMounts pgtype.Text `json:"docker_volume_mounts"`
 	DockerNamedVolumes pgtype.Text `json:"docker_named_volumes"`
 	DockerNetworkHost  pgtype.Bool `json:"docker_network_host"`
+	HealthCheckPath    pgtype.Text `json:"health_check_path"`
 	Status             pgtype.Text `json:"status"`
 	ID                 uuid.UUID   `json:"id"`
 }
@@ -258,6 +267,7 @@ func (q *Queries) UpdateSite(ctx context.Context, arg UpdateSiteParams) (Site, e
 		arg.DockerVolumeMounts,
 		arg.DockerNamedVolumes,
 		arg.DockerNetworkHost,
+		arg.HealthCheckPath,
 		arg.Status,
 		arg.ID,
 	)
@@ -279,6 +289,7 @@ func (q *Queries) UpdateSite(ctx context.Context, arg UpdateSiteParams) (Site, e
 		&i.DockerVolumeMounts,
 		&i.DockerNamedVolumes,
 		&i.DockerNetworkHost,
+		&i.HealthCheckPath,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -287,7 +298,7 @@ func (q *Queries) UpdateSite(ctx context.Context, arg UpdateSiteParams) (Site, e
 }
 
 const updateSiteHostPort = `-- name: UpdateSiteHostPort :one
-UPDATE sites SET host_port = $2, updated_at = now() WHERE id = $1 RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at
+UPDATE sites SET host_port = $2, updated_at = now() WHERE id = $1 RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, health_check_path, status, created_at, updated_at
 `
 
 type UpdateSiteHostPortParams struct {
@@ -315,6 +326,7 @@ func (q *Queries) UpdateSiteHostPort(ctx context.Context, arg UpdateSiteHostPort
 		&i.DockerVolumeMounts,
 		&i.DockerNamedVolumes,
 		&i.DockerNetworkHost,
+		&i.HealthCheckPath,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -323,7 +335,7 @@ func (q *Queries) UpdateSiteHostPort(ctx context.Context, arg UpdateSiteHostPort
 }
 
 const updateSiteStatus = `-- name: UpdateSiteStatus :one
-UPDATE sites SET status = $2, updated_at = now() WHERE id = $1 RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, status, created_at, updated_at
+UPDATE sites SET status = $2, updated_at = now() WHERE id = $1 RETURNING id, name, slug, primary_url, git_repo_url, git_branch, dockerfile_path, build_context, container_port, host_port, nginx_ssl_enabled, nginx_force_https, site_type, docker_volume_mounts, docker_named_volumes, docker_network_host, health_check_path, status, created_at, updated_at
 `
 
 type UpdateSiteStatusParams struct {
@@ -351,6 +363,7 @@ func (q *Queries) UpdateSiteStatus(ctx context.Context, arg UpdateSiteStatusPara
 		&i.DockerVolumeMounts,
 		&i.DockerNamedVolumes,
 		&i.DockerNetworkHost,
+		&i.HealthCheckPath,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,

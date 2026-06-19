@@ -130,6 +130,8 @@ export const en = {
     docker: "Docker",
     hostPort: "Host port",
     hostNetwork: "host network",
+    healthCheckPath: "Health check path",
+    healthCheckPathDefault: "/health, / (default)",
     dockerfile: "Dockerfile",
     domains: "Domains",
     editSettings: "Edit settings →",
@@ -187,6 +189,9 @@ export const en = {
     namedVolumes: "Named volumes (top-level volumes:)",
     hostNetworkLabel:
       "Host network (network_mode: host) — no Docker port mapping; app listens on container port directly on the VPS. Nginx uses that port on 127.0.0.1.",
+    healthCheckPath: "HTTP health check path",
+    healthCheckPathHint:
+      "Leave empty for defaults (/health, then /). Example: /api/health",
     environmentVariables: "Environment variables",
     envVarsHint:
       "Saved separately from Docker/nginx fields below — editing env vars marks this section dirty; other settings saves will not touch them.",

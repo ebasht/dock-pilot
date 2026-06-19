@@ -31,6 +31,7 @@ export default function SiteSettingsPage() {
   const [volumeMounts, setVolumeMounts] = useState("");
   const [namedVolumes, setNamedVolumes] = useState("");
   const [dockerNetworkHost, setDockerNetworkHost] = useState(false);
+  const [healthCheckPath, setHealthCheckPath] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -56,6 +57,7 @@ export default function SiteSettingsPage() {
       setVolumeMounts((s.docker_volume_mounts ?? []).join("\n"));
       setNamedVolumes((s.docker_named_volumes ?? []).join("\n"));
       setDockerNetworkHost(s.docker_network_host ?? false);
+      setHealthCheckPath(s.health_check_path ?? "");
       setError(null);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t("siteSettings.loadFailed"));
@@ -85,6 +87,7 @@ export default function SiteSettingsPage() {
               container_port: containerPort,
               nginx_ssl_enabled: nginxSsl,
               nginx_force_https: nginxHttps,
+              health_check_path: healthCheckPath.trim(),
               domains,
             }
           : {}),
@@ -216,6 +219,18 @@ export default function SiteSettingsPage() {
               />
               {t("siteSettings.forceHttps")}
             </label>
+            <div className="field">
+              <label className="label">{t("siteSettings.healthCheckPath")}</label>
+              <input
+                className="input"
+                value={healthCheckPath}
+                onChange={(e) => setHealthCheckPath(e.target.value)}
+                placeholder="/api/health"
+              />
+              <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
+                {t("siteSettings.healthCheckPathHint")}
+              </p>
+            </div>
           </>
         )}
         {site?.site_type === "telegram_bot" && (

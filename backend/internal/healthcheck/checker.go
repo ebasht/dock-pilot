@@ -93,7 +93,7 @@ func (c *Checker) Check(ctx context.Context, site db.Site) Result {
 		return res
 	}
 
-	httpInfo := c.probeHTTP(ctx, site.PrimaryUrl)
+	httpInfo := c.probeHTTP(ctx, site.PrimaryUrl, site.HealthCheckPath)
 	if httpInfo != nil {
 		res.HTTP = httpInfo
 	}
@@ -150,12 +150,14 @@ func webOverall(c ContainerInfo, httpInfo *HTTPInfo) (overall, message string) {
 	return "degraded", fmt.Sprintf("Container running; HTTP %d", httpInfo.StatusCode)
 }
 
-func (c *Checker) probeHTTP(ctx context.Context, primaryURL string) *HTTPInfo {
+func (c *Checker) probeHTTP(ctx context.Context, primaryURL, healthCheckPath string) *HTTPInfo {
 	base := siteURL(primaryURL)
 	if base == "" {
 		return nil
 	}
-	for _, path := range []string{"/health", "/"} {
+	paths := healthCheckPaths(healthCheckPath)
+	var last *HTTPInfo
+	for i, path := range paths {
 		url := strings.TrimSuffix(base, "/") + path
 		info := c.doHTTP(ctx, url)
 		if info.OK {
@@ -165,12 +167,23 @@ func (c *Checker) probeHTTP(ctx context.Context, primaryURL string) *HTTPInfo {
 			info.OK = true
 			return info
 		}
-		// keep last attempt for /
-		if path == "/" {
-			return info
+		last = info
+		if i == len(paths)-1 {
+			return last
 		}
 	}
-	return nil
+	return last
+}
+
+func healthCheckPaths(custom string) []string {
+	custom = strings.TrimSpace(custom)
+	if custom != "" {
+		if !strings.HasPrefix(custom, "/") {
+			custom = "/" + custom
+		}
+		return []string{custom}
+	}
+	return []string{"/health", "/"}
 }
 
 func (c *Checker) doHTTP(ctx context.Context, url string) *HTTPInfo {

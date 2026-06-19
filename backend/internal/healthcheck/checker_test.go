@@ -21,3 +21,15 @@ func TestTelegramOverall(t *testing.T) {
 		t.Fatalf("expected unhealthy, got %s", o)
 	}
 }
+
+func TestHealthCheckPaths(t *testing.T) {
+	if got := healthCheckPaths(""); len(got) != 2 || got[0] != "/health" {
+		t.Fatalf("default paths: %#v", got)
+	}
+	if got := healthCheckPaths("/api/health"); len(got) != 1 || got[0] != "/api/health" {
+		t.Fatalf("custom path: %#v", got)
+	}
+	if got := healthCheckPaths("api/health"); len(got) != 1 || got[0] != "/api/health" {
+		t.Fatalf("custom path without slash: %#v", got)
+	}
+}

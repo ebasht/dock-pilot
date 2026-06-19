@@ -3,9 +3,10 @@ INSERT INTO sites (
     name, slug, primary_url, git_repo_url, git_branch,
     dockerfile_path, build_context, container_port, host_port,
     nginx_ssl_enabled, nginx_force_https, site_type,
-    docker_volume_mounts, docker_named_volumes, docker_network_host, status
+    docker_volume_mounts, docker_named_volumes, docker_network_host,
+    health_check_path, status
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
 ) RETURNING *;
 
 -- name: GetSite :one
@@ -33,6 +34,7 @@ UPDATE sites SET
     docker_volume_mounts = COALESCE(sqlc.narg('docker_volume_mounts'), docker_volume_mounts),
     docker_named_volumes = COALESCE(sqlc.narg('docker_named_volumes'), docker_named_volumes),
     docker_network_host = COALESCE(sqlc.narg('docker_network_host'), docker_network_host),
+    health_check_path = COALESCE(sqlc.narg('health_check_path'), health_check_path),
     status = COALESCE(sqlc.narg('status'), status),
     updated_at = now()
 WHERE id = sqlc.arg('id')

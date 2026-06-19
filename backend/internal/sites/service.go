@@ -52,6 +52,10 @@ func (s *Service) Create(ctx context.Context, req CreateSiteRequest) (SiteRespon
 	nginxSSL := req.NginxSSLEnabled
 	nginxForce := req.NginxForceHTTPS
 	containerPort := defaultInt32(req.ContainerPort, 3000)
+	healthPath := ""
+	if IsWebSite(siteType) {
+		healthPath = NormalizeHealthCheckPath(req.HealthCheckPath)
+	}
 
 	if IsTelegramBot(siteType) {
 		if primaryURL == "" {
@@ -87,6 +91,7 @@ func (s *Service) Create(ctx context.Context, req CreateSiteRequest) (SiteRespon
 		DockerVolumeMounts: volumeLinesToText(req.DockerVolumeMounts),
 		DockerNamedVolumes: volumeLinesToText(req.DockerNamedVolumes),
 		DockerNetworkHost:  req.DockerNetworkHost,
+		HealthCheckPath:    healthPath,
 		Status:             "draft",
 	})
 	if err != nil {
@@ -140,6 +145,12 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (SiteResponse, error) {
 }
 
 func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateSiteRequest) (SiteResponse, error) {
+	if req.HealthCheckPath != nil {
+		if err := validateHealthCheckPath(*req.HealthCheckPath); err != nil {
+			return SiteResponse{}, err
+		}
+	}
+
 	if _, err := s.queries.GetSite(ctx, id); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return SiteResponse{}, ErrNotFound
@@ -171,6 +182,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateSiteReques
 		DockerVolumeMounts: volumeTextPtr(req.DockerVolumeMounts),
 		DockerNamedVolumes: volumeTextPtr(req.DockerNamedVolumes),
 		DockerNetworkHost:  boolOpt(req.DockerNetworkHost),
+		HealthCheckPath:    healthCheckPathPtr(req.HealthCheckPath),
 	})
 	if err != nil {
 		return SiteResponse{}, fmt.Errorf("update site: %w", err)
@@ -319,6 +331,9 @@ func validateCreate(req CreateSiteRequest) error {
 	siteType := NormalizeSiteType(req.SiteType)
 	if IsWebSite(siteType) && strings.TrimSpace(req.PrimaryURL) == "" {
 		return fmt.Errorf("%w: primary_url is required", ErrInvalidInput)
+	}
+	if err := validateHealthCheckPath(req.HealthCheckPath); err != nil {
+		return err
 	}
 	if req.Slug != "" && !slugPattern.MatchString(strings.ToLower(req.Slug)) {
 		return fmt.Errorf("%w: invalid slug", ErrInvalidInput)

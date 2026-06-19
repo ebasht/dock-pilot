@@ -41,7 +41,7 @@ Tag: ${VERSION}
 
 One-line install on VPS (after release is published):
 
-  curl -fsSL https://raw.githubusercontent.com/e-bashtan/dock-pilot/main/scripts/install.sh | sudo bash -s -- \\
+  curl -fsSL https://raw.githubusercontent.com/ebasht/dock-pilot/main/scripts/install.sh | sudo bash -s -- \\
     --domain deploy.example.com --email you@example.com --version ${VERSION}
 
 EOF

@@ -21,6 +21,7 @@ func toSiteResponse(site db.Site, domains []db.SiteDomain, envVars []db.SiteEnvV
 		DockerVolumeMounts: volumeLinesFromText(site.DockerVolumeMounts),
 		DockerNamedVolumes: volumeLinesFromText(site.DockerNamedVolumes),
 		DockerNetworkHost:  site.DockerNetworkHost,
+		HealthCheckPath:    site.HealthCheckPath,
 		Status:             site.Status,
 		CreatedAt:       site.CreatedAt,
 		UpdatedAt:       site.UpdatedAt,

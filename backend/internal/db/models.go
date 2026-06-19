@@ -33,8 +33,10 @@ type NotificationSetting struct {
 	ID                        int32              `json:"id"`
 	Enabled                   bool               `json:"enabled"`
 	TelegramChatID            string             `json:"telegram_chat_id"`
+	TelegramHttpProxy         string             `json:"telegram_http_proxy"`
 	DailyDigestEnabled        bool               `json:"daily_digest_enabled"`
 	DailyDigestHour           int32              `json:"daily_digest_hour"`
+	DailyDigestTimezone       string             `json:"daily_digest_timezone"`
 	AlertOnIncidentEnabled    bool               `json:"alert_on_incident_enabled"`
 	EncryptedTelegramBotToken []byte             `json:"encrypted_telegram_bot_token"`
 	LastDailySentAt           pgtype.Timestamptz `json:"last_daily_sent_at"`
@@ -59,6 +61,7 @@ type Site struct {
 	DockerVolumeMounts string      `json:"docker_volume_mounts"`
 	DockerNamedVolumes string      `json:"docker_named_volumes"`
 	DockerNetworkHost  bool        `json:"docker_network_host"`
+	HealthCheckPath    string      `json:"health_check_path"`
 	Status             string      `json:"status"`
 	CreatedAt          time.Time   `json:"created_at"`
 	UpdatedAt          time.Time   `json:"updated_at"`
@@ -88,19 +91,4 @@ type SiteSecret struct {
 	EncryptedValue []byte    `json:"encrypted_value"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
-}
-
-type NotificationSettings struct {
-	ID                         int32              `json:"id"`
-	Enabled                    bool               `json:"enabled"`
-	TelegramChatID             string             `json:"telegram_chat_id"`
-	TelegramHttpProxy          string             `json:"telegram_http_proxy"`
-	DailyDigestEnabled         bool               `json:"daily_digest_enabled"`
-	DailyDigestHour            int32              `json:"daily_digest_hour"`
-	DailyDigestTimezone        string             `json:"daily_digest_timezone"`
-	AlertOnIncidentEnabled     bool               `json:"alert_on_incident_enabled"`
-	EncryptedTelegramBotToken  []byte             `json:"encrypted_telegram_bot_token"`
-	LastDailySentAt            pgtype.Timestamptz `json:"last_daily_sent_at"`
-	LastOverallBySite          []byte             `json:"last_overall_by_site"`
-	UpdatedAt                  time.Time          `json:"updated_at"`
 }

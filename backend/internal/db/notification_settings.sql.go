@@ -7,30 +7,66 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const notificationSettingsColumns = `id, enabled, telegram_chat_id, telegram_http_proxy, daily_digest_enabled, daily_digest_hour, daily_digest_timezone, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at`
+const clearNotificationToken = `-- name: ClearNotificationToken :exec
+UPDATE notification_settings
+SET encrypted_telegram_bot_token = NULL, updated_at = now()
+WHERE id = 1
+`
+
+func (q *Queries) ClearNotificationToken(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, clearNotificationToken)
+	return err
+}
 
 const ensureNotificationSettings = `-- name: EnsureNotificationSettings :one
 INSERT INTO notification_settings (id) VALUES (1)
 ON CONFLICT (id) DO UPDATE SET updated_at = notification_settings.updated_at
-RETURNING ` + notificationSettingsColumns
+RETURNING id, enabled, telegram_chat_id, daily_digest_enabled, daily_digest_hour, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at
+`
 
-func (q *Queries) EnsureNotificationSettings(ctx context.Context) (NotificationSettings, error) {
+type EnsureNotificationSettingsRow struct {
+	ID                        int32              `json:"id"`
+	Enabled                   bool               `json:"enabled"`
+	TelegramChatID            string             `json:"telegram_chat_id"`
+	DailyDigestEnabled        bool               `json:"daily_digest_enabled"`
+	DailyDigestHour           int32              `json:"daily_digest_hour"`
+	AlertOnIncidentEnabled    bool               `json:"alert_on_incident_enabled"`
+	EncryptedTelegramBotToken []byte             `json:"encrypted_telegram_bot_token"`
+	LastDailySentAt           pgtype.Timestamptz `json:"last_daily_sent_at"`
+	LastOverallBySite         []byte             `json:"last_overall_by_site"`
+	UpdatedAt                 time.Time          `json:"updated_at"`
+}
+
+func (q *Queries) EnsureNotificationSettings(ctx context.Context) (EnsureNotificationSettingsRow, error) {
 	row := q.db.QueryRow(ctx, ensureNotificationSettings)
-	return scanNotificationSettings(row)
+	var i EnsureNotificationSettingsRow
+	err := row.Scan(
+		&i.ID,
+		&i.Enabled,
+		&i.TelegramChatID,
+		&i.DailyDigestEnabled,
+		&i.DailyDigestHour,
+		&i.AlertOnIncidentEnabled,
+		&i.EncryptedTelegramBotToken,
+		&i.LastDailySentAt,
+		&i.LastOverallBySite,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getNotificationSettings = `-- name: GetNotificationSettings :one
-SELECT ` + notificationSettingsColumns + ` FROM notification_settings WHERE id = 1
+SELECT id, enabled, telegram_chat_id, telegram_http_proxy, daily_digest_enabled, daily_digest_hour, daily_digest_timezone, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at FROM notification_settings WHERE id = 1
 `
 
-func scanNotificationSettings(row interface {
-	Scan(dest ...any) error
-}) (NotificationSettings, error) {
-	var i NotificationSettings
+func (q *Queries) GetNotificationSettings(ctx context.Context) (NotificationSetting, error) {
+	row := q.db.QueryRow(ctx, getNotificationSettings)
+	var i NotificationSetting
 	err := row.Scan(
 		&i.ID,
 		&i.Enabled,
@@ -46,69 +82,6 @@ func scanNotificationSettings(row interface {
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-func (q *Queries) GetNotificationSettings(ctx context.Context) (NotificationSettings, error) {
-	row := q.db.QueryRow(ctx, getNotificationSettings)
-	return scanNotificationSettings(row)
-}
-
-const updateNotificationSettings = `-- name: UpdateNotificationSettings :one
-UPDATE notification_settings SET
-    enabled = $1,
-    telegram_chat_id = $2,
-    telegram_http_proxy = $3,
-    daily_digest_enabled = $4,
-    daily_digest_hour = $5,
-    daily_digest_timezone = $6,
-    alert_on_incident_enabled = $7,
-    updated_at = now()
-WHERE id = 1
-RETURNING ` + notificationSettingsColumns
-
-type UpdateNotificationSettingsParams struct {
-	Enabled                bool   `json:"enabled"`
-	TelegramChatID         string `json:"telegram_chat_id"`
-	TelegramHttpProxy      string `json:"telegram_http_proxy"`
-	DailyDigestEnabled     bool   `json:"daily_digest_enabled"`
-	DailyDigestHour        int32  `json:"daily_digest_hour"`
-	DailyDigestTimezone    string `json:"daily_digest_timezone"`
-	AlertOnIncidentEnabled bool   `json:"alert_on_incident_enabled"`
-}
-
-func (q *Queries) UpdateNotificationSettings(ctx context.Context, arg UpdateNotificationSettingsParams) (NotificationSettings, error) {
-	row := q.db.QueryRow(ctx, updateNotificationSettings,
-		arg.Enabled,
-		arg.TelegramChatID,
-		arg.TelegramHttpProxy,
-		arg.DailyDigestEnabled,
-		arg.DailyDigestHour,
-		arg.DailyDigestTimezone,
-		arg.AlertOnIncidentEnabled,
-	)
-	return scanNotificationSettings(row)
-}
-
-const updateNotificationToken = `-- name: UpdateNotificationToken :exec
-UPDATE notification_settings
-SET encrypted_telegram_bot_token = $1, updated_at = now()
-WHERE id = 1
-`
-
-func (q *Queries) UpdateNotificationToken(ctx context.Context, encryptedTelegramBotToken []byte) error {
-	_, err := q.db.Exec(ctx, updateNotificationToken, encryptedTelegramBotToken)
-	return err
-}
-
-const clearNotificationToken = `-- name: ClearNotificationToken :exec
-UPDATE notification_settings
-SET encrypted_telegram_bot_token = NULL, updated_at = now()
-WHERE id = 1
-`
-
-func (q *Queries) ClearNotificationToken(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, clearNotificationToken)
-	return err
 }
 
 const updateNotificationLastDailySent = `-- name: UpdateNotificationLastDailySent :exec
@@ -130,5 +103,68 @@ WHERE id = 1
 
 func (q *Queries) UpdateNotificationLastOverall(ctx context.Context, lastOverallBySite []byte) error {
 	_, err := q.db.Exec(ctx, updateNotificationLastOverall, lastOverallBySite)
+	return err
+}
+
+const updateNotificationSettings = `-- name: UpdateNotificationSettings :one
+UPDATE notification_settings SET
+    enabled = $1,
+    telegram_chat_id = $2,
+    telegram_http_proxy = $3,
+    daily_digest_enabled = $4,
+    daily_digest_hour = $5,
+    daily_digest_timezone = $6,
+    alert_on_incident_enabled = $7,
+    updated_at = now()
+WHERE id = 1
+RETURNING id, enabled, telegram_chat_id, telegram_http_proxy, daily_digest_enabled, daily_digest_hour, daily_digest_timezone, alert_on_incident_enabled, encrypted_telegram_bot_token, last_daily_sent_at, last_overall_by_site, updated_at
+`
+
+type UpdateNotificationSettingsParams struct {
+	Enabled                bool   `json:"enabled"`
+	TelegramChatID         string `json:"telegram_chat_id"`
+	TelegramHttpProxy      string `json:"telegram_http_proxy"`
+	DailyDigestEnabled     bool   `json:"daily_digest_enabled"`
+	DailyDigestHour        int32  `json:"daily_digest_hour"`
+	DailyDigestTimezone    string `json:"daily_digest_timezone"`
+	AlertOnIncidentEnabled bool   `json:"alert_on_incident_enabled"`
+}
+
+func (q *Queries) UpdateNotificationSettings(ctx context.Context, arg UpdateNotificationSettingsParams) (NotificationSetting, error) {
+	row := q.db.QueryRow(ctx, updateNotificationSettings,
+		arg.Enabled,
+		arg.TelegramChatID,
+		arg.TelegramHttpProxy,
+		arg.DailyDigestEnabled,
+		arg.DailyDigestHour,
+		arg.DailyDigestTimezone,
+		arg.AlertOnIncidentEnabled,
+	)
+	var i NotificationSetting
+	err := row.Scan(
+		&i.ID,
+		&i.Enabled,
+		&i.TelegramChatID,
+		&i.TelegramHttpProxy,
+		&i.DailyDigestEnabled,
+		&i.DailyDigestHour,
+		&i.DailyDigestTimezone,
+		&i.AlertOnIncidentEnabled,
+		&i.EncryptedTelegramBotToken,
+		&i.LastDailySentAt,
+		&i.LastOverallBySite,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateNotificationToken = `-- name: UpdateNotificationToken :exec
+UPDATE notification_settings
+SET encrypted_telegram_bot_token = $1, updated_at = now()
+WHERE id = 1
+`
+
+func (q *Queries) UpdateNotificationToken(ctx context.Context, encryptedTelegramBotToken []byte) error {
+	_, err := q.db.Exec(ctx, updateNotificationToken, encryptedTelegramBotToken)
 	return err
 }

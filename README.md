@@ -14,7 +14,7 @@
 
 ```bash
 curl -fsSL -H "Accept: application/vnd.github.raw+json" \
-  "https://api.github.com/repos/e-bashtan/dock-pilot/contents/scripts/install.sh?ref=main" \
+  "https://api.github.com/repos/ebasht/dock-pilot/contents/scripts/install.sh?ref=main" \
   -o /tmp/dock-pilot-install.sh
 
 sudo bash /tmp/dock-pilot-install.sh \
@@ -47,7 +47,7 @@ sudo bash /tmp/dock-pilot-install.sh \
 
 ```bash
 curl -fsSL -H "Accept: application/vnd.github.raw+json" \
-  "https://api.github.com/repos/e-bashtan/dock-pilot/contents/scripts/dock-pilot-upgrade.sh?ref=main" \
+  "https://api.github.com/repos/ebasht/dock-pilot/contents/scripts/dock-pilot-upgrade.sh?ref=main" \
   -o /tmp/dock-pilot-upgrade.sh
 
 sudo bash /tmp/dock-pilot-upgrade.sh v0.1.7
@@ -63,7 +63,7 @@ sudo bash /tmp/dock-pilot-upgrade.sh latest
 
 Проверка: версия в шапке панели (например `v0.1.19`).
 
-Релизы: [github.com/e-bashtan/dock-pilot/releases](https://github.com/e-bashtan/dock-pilot/releases)
+Релизы: [github.com/ebasht/dock-pilot/releases](https://github.com/ebasht/dock-pilot/releases)
 
 ---
 

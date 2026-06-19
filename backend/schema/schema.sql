@@ -17,6 +17,7 @@ CREATE TABLE sites (
     docker_volume_mounts TEXT NOT NULL DEFAULT '',
     docker_named_volumes TEXT NOT NULL DEFAULT '',
     docker_network_host BOOLEAN NOT NULL DEFAULT false,
+    health_check_path TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'draft',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

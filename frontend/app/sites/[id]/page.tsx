@@ -234,6 +234,10 @@ export default function SiteDetailPage() {
                         : t("common.emDash")
                   }
                 />
+                <Info
+                  label={t("site.healthCheckPath")}
+                  value={site.health_check_path?.trim() || t("site.healthCheckPathDefault")}
+                />
               </>
             )}
             {site.site_type === "telegram_bot" && (

@@ -104,6 +104,7 @@ export interface Site {
   docker_volume_mounts: string[];
   docker_named_volumes: string[];
   docker_network_host: boolean;
+  health_check_path: string;
   status: string;
   domains: Domain[];
   env_vars: EnvVar[];
@@ -126,6 +127,7 @@ export interface CreateSiteRequest {
   docker_volume_mounts?: string[];
   docker_named_volumes?: string[];
   docker_network_host?: boolean;
+  health_check_path?: string;
   domains?: { domain: string; is_primary: boolean }[];
   env_vars?: EnvVar[];
 }

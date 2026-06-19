@@ -132,6 +132,8 @@ export const ru: Messages = {
     docker: "Docker",
     hostPort: "Порт на хосте",
     hostNetwork: "сеть хоста",
+    healthCheckPath: "Путь health check",
+    healthCheckPathDefault: "/health, / (по умолчанию)",
     dockerfile: "Dockerfile",
     domains: "Домены",
     editSettings: "Изменить настройки →",
@@ -189,6 +191,9 @@ export const ru: Messages = {
     namedVolumes: "Именованные тома (top-level volumes:)",
     hostNetworkLabel:
       "Сеть хоста (network_mode: host) — без проброса портов Docker; приложение слушает порт контейнера прямо на VPS. Nginx обращается к этому порту на 127.0.0.1.",
+    healthCheckPath: "Путь HTTP health check",
+    healthCheckPathHint:
+      "Пусто — по умолчанию (/health, затем /). Например: /api/health",
     environmentVariables: "Переменные окружения",
     envVarsHint:
       "Сохраняются отдельно от полей Docker/nginx — при редактировании env vars эта секция помечается как изменённая; остальные настройки их не затрагивают.",

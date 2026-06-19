@@ -24,5 +24,6 @@ export function normalizeSite(site: Site): Site {
     env_vars: (site.env_vars ?? []).map(normalizeEnvVar),
     docker_volume_mounts: site.docker_volume_mounts ?? [],
     docker_named_volumes: site.docker_named_volumes ?? [],
+    health_check_path: site.health_check_path ?? "",
   };
 }

@@ -31,6 +31,7 @@ type CreateSiteRequest struct {
 	DockerVolumeMounts []string      `json:"docker_volume_mounts"`
 	DockerNamedVolumes []string      `json:"docker_named_volumes"`
 	DockerNetworkHost  bool          `json:"docker_network_host"`
+	HealthCheckPath    string        `json:"health_check_path"`
 	Domains            []DomainInput `json:"domains"`
 	EnvVars            []EnvVarInput `json:"env_vars"`
 }
@@ -50,6 +51,7 @@ type UpdateSiteRequest struct {
 	DockerVolumeMounts *[]string     `json:"docker_volume_mounts,omitempty"`
 	DockerNamedVolumes *[]string     `json:"docker_named_volumes,omitempty"`
 	DockerNetworkHost  *bool         `json:"docker_network_host,omitempty"`
+	HealthCheckPath    *string       `json:"health_check_path,omitempty"`
 	Domains            []DomainInput `json:"domains,omitempty"`
 	EnvVars            []EnvVarInput `json:"env_vars,omitempty"`
 }
@@ -82,6 +84,7 @@ type SiteResponse struct {
 	DockerVolumeMounts []string         `json:"docker_volume_mounts"`
 	DockerNamedVolumes []string         `json:"docker_named_volumes"`
 	DockerNetworkHost  bool             `json:"docker_network_host"`
+	HealthCheckPath    string           `json:"health_check_path"`
 	Status             string           `json:"status"`
 	Domains         []DomainResponse `json:"domains"`
 	EnvVars         []EnvVarResponse `json:"env_vars"`
