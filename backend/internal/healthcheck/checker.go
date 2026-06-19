@@ -14,6 +14,12 @@ import (
 	"github.com/ebash/dock-pilot/backend/internal/docker"
 )
 
+const (
+	httpProbeTimeout    = 20 * time.Second
+	httpProbeAttempts   = 3
+	httpProbeRetryDelay = 2 * time.Second
+)
+
 // ContainerInfo is Docker runtime state for a site.
 type ContainerInfo struct {
 	Found     bool   `json:"found"`
@@ -51,7 +57,7 @@ func NewChecker(dockerClient docker.Client) *Checker {
 	return &Checker{
 		docker: dockerClient,
 		http: &http.Client{
-			Timeout: 8 * time.Second,
+			Timeout: httpProbeTimeout,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) >= 5 {
 					return fmt.Errorf("too many redirects")
@@ -93,7 +99,7 @@ func (c *Checker) Check(ctx context.Context, site db.Site) Result {
 		return res
 	}
 
-	httpInfo := c.probeHTTP(ctx, site.PrimaryUrl, site.HealthCheckPath)
+	httpInfo := c.probeHTTP(ctx, site)
 	if httpInfo != nil {
 		res.HTTP = httpInfo
 	}
@@ -150,29 +156,82 @@ func webOverall(c ContainerInfo, httpInfo *HTTPInfo) (overall, message string) {
 	return "degraded", fmt.Sprintf("Container running; HTTP %d", httpInfo.StatusCode)
 }
 
-func (c *Checker) probeHTTP(ctx context.Context, primaryURL, healthCheckPath string) *HTTPInfo {
-	base := siteURL(primaryURL)
-	if base == "" {
-		return nil
-	}
-	paths := healthCheckPaths(healthCheckPath)
+func (c *Checker) probeHTTP(ctx context.Context, site db.Site) *HTTPInfo {
+	paths := healthCheckPaths(site.HealthCheckPath)
 	var last *HTTPInfo
 	for i, path := range paths {
-		url := strings.TrimSuffix(base, "/") + path
-		info := c.doHTTP(ctx, url)
-		if info.OK {
-			return info
+		for _, target := range probeTargets(site, path) {
+			info := c.doHTTPWithRetries(ctx, target.URL, target.Host)
+			if info.OK {
+				return info
+			}
+			if info.Error == "" && info.StatusCode >= 200 && info.StatusCode < 400 {
+				info.OK = true
+				return info
+			}
+			last = info
 		}
-		if info.Error == "" && info.StatusCode >= 200 && info.StatusCode < 400 {
-			info.OK = true
-			return info
-		}
-		last = info
 		if i == len(paths)-1 {
 			return last
 		}
 	}
 	return last
+}
+
+type httpProbe struct {
+	URL  string
+	Host string
+}
+
+func probeTargets(site db.Site, path string) []httpProbe {
+	var out []httpProbe
+	host := primaryHost(site.PrimaryUrl)
+	port := upstreamPort(site)
+
+	if port > 0 {
+		out = append(out, httpProbe{
+			URL:  fmt.Sprintf("http://127.0.0.1:%d%s", port, path),
+			Host: host,
+		})
+	}
+	if host != "" {
+		out = append(out, httpProbe{
+			URL:  "http://127.0.0.1" + path,
+			Host: host,
+		})
+	}
+	if base := siteURL(site.PrimaryUrl); base != "" {
+		out = append(out, httpProbe{
+			URL: strings.TrimSuffix(base, "/") + path,
+		})
+	}
+	return out
+}
+
+func upstreamPort(site db.Site) int {
+	if site.DockerNetworkHost {
+		return int(site.ContainerPort)
+	}
+	if site.HostPort.Valid && site.HostPort.Int32 > 0 {
+		return int(site.HostPort.Int32)
+	}
+	if site.ContainerPort > 0 {
+		return int(site.ContainerPort)
+	}
+	return 0
+}
+
+func primaryHost(raw string) string {
+	u := strings.TrimSpace(raw)
+	u = strings.TrimPrefix(u, "https://")
+	u = strings.TrimPrefix(u, "http://")
+	if i := strings.Index(u, "/"); i >= 0 {
+		u = u[:i]
+	}
+	if i := strings.Index(u, ":"); i >= 0 {
+		u = u[:i]
+	}
+	return u
 }
 
 func healthCheckPaths(custom string) []string {
@@ -186,7 +245,46 @@ func healthCheckPaths(custom string) []string {
 	return []string{"/health", "/"}
 }
 
-func (c *Checker) doHTTP(ctx context.Context, url string) *HTTPInfo {
+func (c *Checker) doHTTPWithRetries(ctx context.Context, url, host string) *HTTPInfo {
+	var last *HTTPInfo
+	for attempt := 1; attempt <= httpProbeAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			if last != nil {
+				return last
+			}
+			return &HTTPInfo{URL: url, Error: err.Error()}
+		}
+
+		info := c.doHTTP(ctx, url, host)
+		if info.OK {
+			return info
+		}
+		if info.Error == "" && info.StatusCode >= 200 && info.StatusCode < 400 {
+			info.OK = true
+			return info
+		}
+		if !shouldRetryHTTP(info) || attempt == httpProbeAttempts {
+			return info
+		}
+		last = info
+
+		select {
+		case <-ctx.Done():
+			return last
+		case <-time.After(httpProbeRetryDelay):
+		}
+	}
+	return last
+}
+
+func shouldRetryHTTP(info *HTTPInfo) bool {
+	if info.Error != "" {
+		return true
+	}
+	return info.StatusCode >= 500
+}
+
+func (c *Checker) doHTTP(ctx context.Context, url, host string) *HTTPInfo {
 	info := &HTTPInfo{URL: url}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -194,6 +292,10 @@ func (c *Checker) doHTTP(ctx context.Context, url string) *HTTPInfo {
 		return info
 	}
 	req.Header.Set("User-Agent", "DockPilot-HealthCheck/1.0")
+	if host != "" {
+		req.Host = host
+		req.Header.Set("Host", host)
+	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {
