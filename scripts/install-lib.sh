@@ -230,6 +230,77 @@ install_packages() {
   esac
 }
 
+download_with_progress() {
+  local url="$1" dest="$2"
+  local name cl size_human="" show_progress=0
+
+  name="$(basename "$dest")"
+  cl="$(curl -fsSLI -L "$url" 2>/dev/null | awk 'tolower($1)=="content-length:" {print $2; exit}' | tr -d '\r' || true)"
+  if [[ -n "$cl" && "$cl" =~ ^[0-9]+$ ]]; then
+    size_human="$(numfmt --to=iec-i --suffix=B "$cl" 2>/dev/null || echo "${cl} B")"
+  fi
+
+  if [[ -t 1 || -t 2 || -n "${DOCK_PILOT_FORCE_PROGRESS:-}" ]]; then
+    show_progress=1
+  fi
+
+  if [[ -n "$size_human" ]]; then
+    log "Downloading ${name} (~${size_human})..."
+  else
+    log "Downloading ${name}..."
+  fi
+
+  if [[ "$show_progress" -eq 1 ]]; then
+    if ! curl -fL --progress-bar --stderr - "$url" -o "$dest"; then
+      return 1
+    fi
+    echo ""
+    log "Download complete: ${name}"
+    return 0
+  fi
+
+  log "No TTY — showing progress every 5s (set DOCK_PILOT_FORCE_PROGRESS=1 to force bar)..."
+  curl -fsSL "$url" -o "$dest.part" &
+  local pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    if [[ -f "$dest.part" ]]; then
+      local got
+      got="$(stat -c%s "$dest.part" 2>/dev/null || stat -f%z "$dest.part" 2>/dev/null || echo 0)"
+      if [[ -n "$cl" && "$cl" =~ ^[0-9]+$ && "$cl" -gt 0 ]]; then
+        local pct=$((got * 100 / cl))
+        log "  ${got} / ${cl} bytes (${pct}%)"
+      else
+        log "  ${got} bytes downloaded..."
+      fi
+    else
+      log "  connecting..."
+    fi
+    sleep 5
+  done
+  wait "$pid"
+  local rc=$?
+  if [[ "$rc" -ne 0 ]]; then
+    rm -f "$dest.part"
+    return "$rc"
+  fi
+  mv -f "$dest.part" "$dest"
+  log "Download complete: ${name}"
+}
+
+# Load dock-pilot-images.tar.gz; show byte progress via pv when available.
+load_docker_images() {
+  local images="$1"
+  log "Loading Docker images from $(basename "$images")..."
+  if [[ -t 1 || -t 2 || -n "${DOCK_PILOT_FORCE_PROGRESS:-}" ]] && command -v pv >/dev/null 2>&1; then
+    pv -f -pte "$images" | gunzip -c | docker load
+  else
+    if [[ -t 1 || -t 2 || -n "${DOCK_PILOT_FORCE_PROGRESS:-}" ]] && ! command -v pv >/dev/null 2>&1; then
+      log "Tip: apt install pv for load progress (percent bar)"
+    fi
+    gunzip -c "$images" | docker load
+  fi
+}
+
 github_latest_tag() {
   local repo="$1"
   curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" \
@@ -244,8 +315,7 @@ download_release() {
     [[ -n "$version" ]] || die "Could not resolve latest release for ${repo}"
   fi
   url="https://github.com/${repo}/releases/download/${version}/dock-pilot-${version#v}.tar.gz"
-  log "Downloading ${url} ..."
-  curl -fsSL "$url" -o "$dest"
+  download_with_progress "$url" "$dest"
 }
 
 apply_nginx_hash_tuning() {

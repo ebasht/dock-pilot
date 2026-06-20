@@ -60,6 +60,76 @@ parse_args() {
 
 parse_args "$@"
 
+download_with_progress() {
+  local url="$1" dest="$2"
+  local name cl size_human="" show_progress=0
+
+  name="$(basename "$dest")"
+  cl="$(curl -fsSLI -L "$url" 2>/dev/null | awk 'tolower($1)=="content-length:" {print $2; exit}' | tr -d '\r' || true)"
+  if [[ -n "$cl" && "$cl" =~ ^[0-9]+$ ]]; then
+    size_human="$(numfmt --to=iec-i --suffix=B "$cl" 2>/dev/null || echo "${cl} B")"
+  fi
+
+  if [[ -t 1 || -t 2 || -n "${DOCK_PILOT_FORCE_PROGRESS:-}" ]]; then
+    show_progress=1
+  fi
+
+  if [[ -n "$size_human" ]]; then
+    echo "[dock-pilot] Downloading ${name} (~${size_human})..."
+  else
+    echo "[dock-pilot] Downloading ${name}..."
+  fi
+
+  if [[ "$show_progress" -eq 1 ]]; then
+    if ! curl -fL --progress-bar --stderr - "$url" -o "$dest"; then
+      return 1
+    fi
+    echo ""
+    echo "[dock-pilot] Download complete: ${name}"
+    return 0
+  fi
+
+  echo "[dock-pilot] No TTY — showing progress every 5s..."
+  curl -fsSL "$url" -o "$dest.part" &
+  local pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    if [[ -f "$dest.part" ]]; then
+      local got
+      got="$(stat -c%s "$dest.part" 2>/dev/null || stat -f%z "$dest.part" 2>/dev/null || echo 0)"
+      if [[ -n "$cl" && "$cl" =~ ^[0-9]+$ && "$cl" -gt 0 ]]; then
+        local pct=$((got * 100 / cl))
+        echo "[dock-pilot]   ${got} / ${cl} bytes (${pct}%)"
+      else
+        echo "[dock-pilot]   ${got} bytes downloaded..."
+      fi
+    else
+      echo "[dock-pilot]   connecting..."
+    fi
+    sleep 5
+  done
+  wait "$pid"
+  local rc=$?
+  if [[ "$rc" -ne 0 ]]; then
+    rm -f "$dest.part"
+    return "$rc"
+  fi
+  mv -f "$dest.part" "$dest"
+  echo "[dock-pilot] Download complete: ${name}"
+}
+
+load_docker_images() {
+  local images="$1"
+  log "Loading Docker images from $(basename "$images")..."
+  if [[ -t 1 || -t 2 || -n "${DOCK_PILOT_FORCE_PROGRESS:-}" ]] && command -v pv >/dev/null 2>&1; then
+    pv -f -pte "$images" | gunzip -c | docker load
+  else
+    if [[ -t 1 || -t 2 || -n "${DOCK_PILOT_FORCE_PROGRESS:-}" ]] && ! command -v pv >/dev/null 2>&1; then
+      log "Tip: apt install pv for load progress (percent bar)"
+    fi
+    gunzip -c "$images" | docker load
+  fi
+}
+
 # curl | bash: docker compose run reads stdin and consumes the rest of this script.
 if [[ -p /dev/stdin && -z "${DOCK_PILOT_INSTALL_REEXECED:-}" ]]; then
   export DOCK_PILOT_INSTALL_REEXECED=1
@@ -86,7 +156,9 @@ if [[ -z "$FROM_DIR" && ! -f "${INSTALL_DIR}/docker-compose.full.yml" ]]; then
   URL="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/dock-pilot-${FILE_TAG}.tar.gz"
   echo "[dock-pilot] Downloading ${URL} ..."
   mkdir -p "$INSTALL_DIR"
-  curl -fsSL "$URL" | tar -xzf - -C "$INSTALL_DIR" --strip-components=1
+  download_with_progress "$URL" "${INSTALL_DIR}/.dock-pilot-release.tar.gz"
+  tar -xzf "${INSTALL_DIR}/.dock-pilot-release.tar.gz" -C "$INSTALL_DIR" --strip-components=1
+  rm -f "${INSTALL_DIR}/.dock-pilot-release.tar.gz"
   FROM_DIR="$INSTALL_DIR"
 fi
 
@@ -199,8 +271,7 @@ if docker image inspect dock-pilot-api:latest >/dev/null 2>&1 \
   && docker image inspect dock-pilot-postgres:latest >/dev/null 2>&1; then
   log "Docker images already loaded — skipping docker load"
 else
-  log "Loading Docker images..."
-  gunzip -c "$IMAGES" | docker load
+  load_docker_images "$IMAGES"
 fi
 log "Docker images ready"
 
