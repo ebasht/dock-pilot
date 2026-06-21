@@ -3,12 +3,40 @@
 #
 #   sudo bash scripts/dock-pilot-upgrade.sh v0.1.7
 #   sudo bash scripts/dock-pilot-upgrade.sh latest
+#   sudo bash scripts/dock-pilot-upgrade.sh latest --domain panel.example.com --email you@example.com
 #
 set -euo pipefail
 
 ROOT="${DOCK_PILOT_INSTALL_DIR:-/opt/dock-pilot}"
 GITHUB_REPO="${DOCK_PILOT_GITHUB_REPO:-ebasht/dock-pilot}"
 VERSION="${1:-latest}"
+DOMAIN=""
+EMAIL=""
+SKIP_CERT=0
+
+shift $(( $# > 0 ? 1 : 0 )) || true
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --domain) DOMAIN="$2"; shift 2 ;;
+    --email) EMAIL="$2"; shift 2 ;;
+    --skip-cert) SKIP_CERT=1; shift ;;
+    -h|--help)
+      cat <<EOF
+Usage: dock-pilot-upgrade.sh [VERSION] [options]
+
+  sudo bash dock-pilot-upgrade.sh latest
+  sudo bash dock-pilot-upgrade.sh latest --domain panel.example.com --email you@example.com
+
+Options:
+  --domain DOMAIN   Configure panel HTTPS (DNS must point to this VPS)
+  --email EMAIL     Let's Encrypt email (required with --domain)
+  --skip-cert       With --domain: HTTP only, no TLS for the panel
+EOF
+      exit 0
+      ;;
+    *) die "Unknown option: $1 (try --help)" ;;
+  esac
+done
 
 log() { echo "[dock-pilot] $*"; }
 die() { echo "[dock-pilot] ERROR: $*" >&2; exit 1; }
@@ -136,8 +164,22 @@ docker rm -f dock-pilot-telegram-socks-relay 2>/dev/null || true
 docker compose -f "$COMPOSE" up -d --force-recreate postgres api frontend
 
 if [[ -x "${ROOT}/scripts/configure-panel-nginx.sh" ]]; then
-  log "Refreshing nginx panel config..."
-  bash "${ROOT}/scripts/configure-panel-nginx.sh" || log "WARN: configure-panel-nginx failed — check nginx manually"
+  set -a
+  # shellcheck disable=SC1091
+  source "${ROOT}/.env"
+  set +a
+  if [[ -n "$DOMAIN" ]]; then
+    [[ -n "$EMAIL" ]] || die "--email is required with --domain"
+    log "Configuring panel domain and SSL..."
+    NGINX_ARGS=(--domain "$DOMAIN" --email "$EMAIL")
+    [[ "$SKIP_CERT" -eq 1 ]] && NGINX_ARGS+=(--skip-cert)
+    bash "${ROOT}/scripts/configure-panel-nginx.sh" "${NGINX_ARGS[@]}"
+  elif [[ -n "${PANEL_DOMAIN:-}" ]]; then
+    log "Refreshing nginx panel config..."
+    bash "${ROOT}/scripts/configure-panel-nginx.sh" || log "WARN: configure-panel-nginx failed — check nginx manually"
+  else
+    log "Panel on IP:port — skipping nginx refresh (use --domain to add HTTPS)"
+  fi
 fi
 
 log "Upgrade complete → ${VERSION}"

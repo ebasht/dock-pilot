@@ -65,10 +65,6 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("API_TOKEN must be at least 16 characters")
 	}
 
-	if cfg.Deploy.Mode == "real" && cfg.Deploy.CertbotEmail == "" {
-		return Config{}, fmt.Errorf("CERTBOT_EMAIL is required when DEPLOY_MODE=real")
-	}
-
 	return cfg, nil
 }
 

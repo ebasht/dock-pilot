@@ -17,7 +17,8 @@ if [[ -f .env ]]; then
   # shellcheck disable=SC1091
   source .env
   set +a
-  echo "PANEL_DOMAIN=${PANEL_DOMAIN:-?}"
+  echo "PANEL_DOMAIN=${PANEL_DOMAIN:-(IP access)}"
+  echo "PANEL_HTTP_PORT=${PANEL_HTTP_PORT:-8888}"
   echo "API_PORT=${API_PORT:-8080}  FRONTEND_PORT=${FRONTEND_PORT:-3000}"
 else
   echo "MISSING .env"
@@ -39,8 +40,8 @@ curl -sS -o /dev/null -w "HTTP %{http_code}\n" "http://127.0.0.1:${FE}/" 2>&1 ||
 echo
 
 echo "--- nginx panel config ---"
-ls -la /etc/nginx/sites-enabled/dockpilot-panel.conf 2>&1 || echo "not enabled"
-grep -E 'server_name|proxy_pass|listen' /etc/nginx/sites-available/dockpilot-panel.conf 2>/dev/null || echo "no config file"
+ls -la /etc/nginx/sites-enabled/dockpilot-panel*.conf 2>&1 || echo "not enabled"
+grep -E 'server_name|proxy_pass|listen' /etc/nginx/sites-available/dockpilot-panel*.conf 2>/dev/null || echo "no config file"
 echo
 
 if [[ -n "${PANEL_DOMAIN:-}" ]]; then
@@ -48,6 +49,10 @@ if [[ -n "${PANEL_DOMAIN:-}" ]]; then
   curl -sS -o /dev/null -w "HTTP %{http_code}\n" -H "Host: ${PANEL_DOMAIN}" "http://127.0.0.1/" 2>&1 || true
   echo "--- HTTPS panel ---"
   curl -sSI "https://${PANEL_DOMAIN}/" 2>&1 | head -5 || true
+else
+  PANEL_HTTP_PORT="${PANEL_HTTP_PORT:-8888}"
+  echo "--- HTTP panel (IP:${PANEL_HTTP_PORT}) ---"
+  curl -sS -o /dev/null -w "HTTP %{http_code}\n" "http://127.0.0.1:${PANEL_HTTP_PORT}/" 2>&1 || true
 fi
 echo
 

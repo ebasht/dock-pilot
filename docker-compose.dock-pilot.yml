@@ -54,7 +54,7 @@ services:
       HOST_ROOT: ${HOST_ROOT:-/host}
       NGINX_SITES_AVAILABLE: ${NGINX_SITES_AVAILABLE:-/host/etc/nginx/sites-available}
       NGINX_SITES_ENABLED: ${NGINX_SITES_ENABLED:-/host/etc/nginx/sites-enabled}
-      CERTBOT_EMAIL: ${CERTBOT_EMAIL:?set CERTBOT_EMAIL}
+      CERTBOT_EMAIL: ${CERTBOT_EMAIL:-}
       TELEGRAM_HTTP_PROXY: ${TELEGRAM_HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       HTTP_PROXY: ${HTTP_PROXY:-}

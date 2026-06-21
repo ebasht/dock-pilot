@@ -38,6 +38,10 @@ func (m *RealManager) IssueCertificate(ctx context.Context, domains []string) er
 		return fmt.Errorf("no domains for certificate")
 	}
 
+	if strings.TrimSpace(m.email) == "" {
+		return fmt.Errorf("CERTBOT_EMAIL is not set — add it to .env before issuing SSL certificates")
+	}
+
 	if err := m.ensureAcmeWebroot(); err != nil {
 		return fmt.Errorf("acme webroot: %w", err)
 	}

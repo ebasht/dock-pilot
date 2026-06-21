@@ -405,13 +405,77 @@ write_panel_nginx() {
     "$template" >"$out"
 }
 
+write_panel_nginx_ip() {
+  local template="$1" panel_port="$2" api_port="$3" frontend_port="$4" out="$5"
+  sed \
+    -e "s/{{PANEL_HTTP_PORT}}/${panel_port}/g" \
+    -e "s/{{API_PORT}}/${api_port}/g" \
+    -e "s/{{FRONTEND_PORT}}/${frontend_port}/g" \
+    "$template" >"$out"
+}
+
+detect_primary_ip() {
+  local ip
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  if [[ -z "$ip" ]]; then
+    ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}')"
+  fi
+  echo "$ip"
+}
+
+panel_cors_origins_ip() {
+  local panel_port="$1"
+  local ip origins=""
+  ip="$(detect_primary_ip)"
+  origins="http://127.0.0.1:${panel_port}"
+  if [[ -n "$ip" ]]; then
+    origins="http://${ip}:${panel_port},${origins}"
+  fi
+  echo "$origins"
+}
+
+panel_url_for_env() {
+  local domain="$1" panel_port="$2" skip_cert="$3"
+  if [[ -n "$domain" ]]; then
+    if [[ "$skip_cert" -eq 1 ]]; then
+      echo "http://${domain}"
+    else
+      echo "https://${domain}"
+    fi
+    return 0
+  fi
+  local ip
+  ip="$(detect_primary_ip)"
+  if [[ -n "$ip" ]]; then
+    echo "http://${ip}:${panel_port}"
+  else
+    echo "http://127.0.0.1:${panel_port}"
+  fi
+}
+
+disable_panel_nginx_site() {
+  local enabled="$1" name="$2"
+  rm -f "${enabled}/${name}" 2>/dev/null || true
+}
+
 enable_panel_nginx() {
   local available="$1" enabled="$2" domain="$3" name="dockpilot-panel.conf"
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
   rm -f "${enabled}/default" "${enabled}/default.conf" 2>/dev/null || true
+  disable_panel_nginx_site "$enabled" "dockpilot-panel-ip.conf"
   fix_nginx_no_ipv6
   ln -sf "$available/$name" "$enabled/$name"
   test_and_reload_nginx "$domain"
+}
+
+enable_panel_nginx_ip() {
+  local available="$1" enabled="$2" name="dockpilot-panel-ip.conf"
+  rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
+  disable_panel_nginx_site "$enabled" "dockpilot-panel.conf"
+  fix_nginx_no_ipv6
+  ln -sf "$available/$name" "$enabled/$name"
+  nginx -t
+  systemctl reload nginx
 }
 
 issue_panel_cert() {
@@ -486,9 +550,18 @@ postgres_volume_exists() {
     || docker volume inspect dock_pilot_pg >/dev/null 2>&1
 }
 
-# Write HTTP vhost, reload nginx, issue Let's Encrypt, update API CORS. Fails on cert error unless skip_cert.
+# Write HTTP vhost, reload nginx, optionally issue Let's Encrypt for the panel domain.
 configure_panel_nginx() {
   local install_dir="$1" domain="$2" email="$3" api_port="$4" frontend_port="$5" skip_cert="$6"
+  local panel_port="${7:-8888}"
+
+  if [[ -z "$domain" ]]; then
+    configure_panel_nginx_ip "$install_dir" "$api_port" "$frontend_port" "$panel_port"
+    return 0
+  fi
+
+  [[ -n "$email" ]] || die "CERTBOT_EMAIL is required when PANEL_DOMAIN is set"
+
   local template="${install_dir}/install/nginx-panel.conf.template"
   local available="/etc/nginx/sites-available/dockpilot-panel.conf"
 
@@ -515,6 +588,34 @@ configure_panel_nginx() {
   fi
 
   log "TLS certificate installed for ${domain}"
+}
+
+configure_panel_nginx_ip() {
+  local install_dir="$1" api_port="$2" frontend_port="$3" panel_port="$4"
+  local template="${install_dir}/install/nginx-panel-ip.conf.template"
+  local available="/etc/nginx/sites-available/dockpilot-panel-ip.conf"
+
+  [[ -f "$template" ]] || die "Missing ${template}"
+
+  log "Writing panel nginx config for IP access on port ${panel_port} (api=${api_port}, ui=${frontend_port}) ..."
+  write_panel_nginx_ip "$template" "$panel_port" "$api_port" "$frontend_port" "$available"
+  log "Enabling nginx site and reloading ..."
+  enable_panel_nginx_ip /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+  if ! curl -fsS "http://127.0.0.1:${panel_port}/" >/dev/null 2>&1; then
+    log "WARN: HTTP probe on 127.0.0.1:${panel_port} failed — check nginx"
+  fi
+
+  log "Panel available at $(panel_url_for_env "" "$panel_port" 1) (no TLS)"
+}
+
+pick_panel_http_port() {
+  local port="${1:-8888}"
+  if port_in_use "$port"; then
+    port="$(pick_free_port "$((port + 1))")"
+    log "Panel port busy — using ${port}"
+  fi
+  echo "$port"
 }
 
 verify_panel_https() {
