@@ -57,11 +57,13 @@ func (m *RealManager) globalTuningConfHostPath() string {
 	return m.host.ChrootPath(globalTuningHostPath)
 }
 
-// Hash tuning lives only in conf.d; active directives in nginx.conf cause duplicate emerg on nginx -t.
-const commentNginxConfHashScript = `NGINX=/etc/nginx/nginx.conf
-[ -f "$NGINX" ] || exit 0
-sed -i -E 's/^\s*server_names_hash_bucket_size\s+[^;]+;/# server_names_hash_bucket_size (managed in conf.d);/' "$NGINX" 2>/dev/null || true
-sed -i -E 's/^\s*server_names_hash_max_size\s+[^;]+;/# server_names_hash_max_size (managed in conf.d);/' "$NGINX" 2>/dev/null || true
+// Hash tuning lives only in conf.d/00-dockpilot-global.conf; active copies elsewhere break nginx -t.
+const commentNginxConfHashScript = `KEEP=/etc/nginx/conf.d/00-dockpilot-global.conf
+for f in /etc/nginx/nginx.conf /etc/nginx/conf.d/*.conf; do
+  [ -f "$f" ] || continue
+  [ "$f" = "$KEEP" ] && continue
+  sed -i -E '/^[[:space:]]*#/! s/^[[:space:]]*(server_names_hash_(bucket_size|max_size)[^;]*;)/# \1/' "$f" 2>/dev/null || true
+done
 `
 
 func (m *RealManager) ensureConfOnlyHashTuning(ctx context.Context) error {

@@ -321,25 +321,52 @@ download_release() {
 apply_nginx_hash_tuning() {
   local bucket="${1:-128}"
   local max_size="${2:-2048}"
-  local nginx_conf="/etc/nginx/nginx.conf"
   local conf_snippet="/etc/nginx/conf.d/00-dockpilot-global.conf"
 
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
-
-  # Single source of truth: conf.d (API also writes this file on deploy).
-  # Comment out active hash lines in nginx.conf — duplicates break nginx -t.
-  if grep -qE '^\s*server_names_hash_bucket_size' "$nginx_conf" 2>/dev/null; then
-    sed -i -E 's/^\s*server_names_hash_bucket_size\s+[^;]+;/# server_names_hash_bucket_size (use conf.d);/' "$nginx_conf"
-  fi
-  if grep -qE '^\s*server_names_hash_max_size' "$nginx_conf" 2>/dev/null; then
-    sed -i -E 's/^\s*server_names_hash_max_size\s+[^;]+;/# server_names_hash_max_size (use conf.d);/' "$nginx_conf"
-  fi
+  comment_foreign_nginx_hash_directives "$conf_snippet"
 
   cat >"$conf_snippet" <<EOF
 # Managed by dock-pilot
 server_names_hash_bucket_size ${bucket};
 server_names_hash_max_size ${max_size};
 EOF
+}
+
+# Keep hash tuning in conf.d/00-dockpilot-global.conf only — duplicates break nginx -t and certbot.
+comment_foreign_nginx_hash_directives() {
+  local keep="${1:-/etc/nginx/conf.d/00-dockpilot-global.conf}"
+  local f
+
+  for f in /etc/nginx/nginx.conf /etc/nginx/conf.d/*.conf; do
+    [[ -f "$f" ]] || continue
+    [[ "$f" == "$keep" ]] && continue
+    if grep -qE '^[[:space:]]*server_names_hash_(bucket_size|max_size)[[:space:]]' "$f" 2>/dev/null; then
+      sed -i -E '/^[[:space:]]*#/! s/^[[:space:]]*(server_names_hash_(bucket_size|max_size)[^;]*;)/# \1/' "$f"
+      log "Commented duplicate hash directives in ${f}"
+    fi
+  done
+}
+
+ensure_nginx_config_valid() {
+  local err domain="${1:-localhost}"
+  comment_foreign_nginx_hash_directives
+  err="$(mktemp)"
+  if nginx -t 2>"$err"; then
+    rm -f "$err"
+    return 0
+  fi
+  if grep -q 'duplicate' "$err" 2>/dev/null && grep -q 'server_names_hash' "$err" 2>/dev/null; then
+    log "Fixing duplicate server_names_hash directives..."
+    sed -i -E '/^[[:space:]]*#/! s/^[[:space:]]*(server_names_hash_(bucket_size|max_size)[^;]*;)/# \1/' /etc/nginx/nginx.conf
+    comment_foreign_nginx_hash_directives
+    rm -f "$err"
+    nginx -t
+    return $?
+  fi
+  cat "$err" >&2
+  rm -f "$err"
+  return 1
 }
 
 write_nginx_global_tuning() {
@@ -377,8 +404,8 @@ test_and_reload_nginx() {
     fi
     if grep -q 'duplicate' "$err" 2>/dev/null && grep -q 'server_names_hash' "$err" 2>/dev/null; then
       log "Fixing duplicate server_names_hash (comment nginx.conf, keep conf.d) ..."
-      sed -i -E 's/^\s*server_names_hash_bucket_size\s+[^;]+;/# server_names_hash_bucket_size (use conf.d);/' /etc/nginx/nginx.conf
-      sed -i -E 's/^\s*server_names_hash_max_size\s+[^;]+;/# server_names_hash_max_size (use conf.d);/' /etc/nginx/nginx.conf
+      sed -i -E '/^[[:space:]]*#/! s/^[[:space:]]*(server_names_hash_(bucket_size|max_size)[^;]*;)/# \1/' /etc/nginx/nginx.conf
+      comment_foreign_nginx_hash_directives
       rm -f "$err"
       continue
     fi
@@ -481,6 +508,7 @@ enable_panel_nginx_ip() {
 issue_panel_cert() {
   local domain="$1" email="$2"
   rm -f /etc/nginx/conf.d/00-vpsdeploy-global.conf 2>/dev/null || true
+  ensure_nginx_config_valid "$domain" || die "nginx -t failed before certbot — fix /etc/nginx manually"
   certbot --nginx -d "$domain" --non-interactive --agree-tos -m "$email" --redirect --no-eff-email
 }
 
