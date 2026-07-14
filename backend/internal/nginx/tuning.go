@@ -3,11 +3,15 @@ package nginx
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 )
 
-const globalTuningHostPath = "/etc/nginx/conf.d/00-dockpilot-global.conf"
+const (
+	nginxConfHostPath   = "/etc/nginx/nginx.conf"
+	hashBeginMarker     = "# BEGIN dock-pilot nginx hash"
+	hashEndMarker       = "# END dock-pilot nginx hash"
+	legacyConfDHashPath = "/etc/nginx/conf.d/00-dockpilot-global.conf"
+)
 
 // serverNamesHashSettings returns nginx http-level hash settings for the given domain list.
 func serverNamesHashSettings(domains []string) (bucketSize, maxSize int) {
@@ -46,60 +50,54 @@ func serverNamesHashSettings(domains []string) (bucketSize, maxSize int) {
 	return bucket, maxSize
 }
 
-func globalTuningConfig(bucketSize, maxSize int) string {
-	return fmt.Sprintf(`# Managed by dock-pilot — required for long server_name values
-server_names_hash_bucket_size %d;
-server_names_hash_max_size %d;
-`, bucketSize, maxSize)
-}
+func applyNginxHashTuningScript(bucketSize, maxSize int) string {
+	return fmt.Sprintf(`set -e
+NGINX=%q
+BEGIN=%q
+END=%q
+BUCKET=%d
+MAX=%d
 
-func (m *RealManager) globalTuningConfHostPath() string {
-	return m.host.ChrootPath(globalTuningHostPath)
-}
+rm -f %q /etc/nginx/conf.d/00-vpsdeploy-global.conf
 
-// Hash tuning lives only in conf.d/00-dockpilot-global.conf; active copies elsewhere break nginx -t.
-const commentNginxConfHashScript = `KEEP=/etc/nginx/conf.d/00-dockpilot-global.conf
-for f in /etc/nginx/nginx.conf /etc/nginx/conf.d/*.conf; do
+for f in /etc/nginx/conf.d/*.conf; do
   [ -f "$f" ] || continue
-  [ "$f" = "$KEEP" ] && continue
   sed -i -E '/^[[:space:]]*#/! s/^[[:space:]]*(server_names_hash_(bucket_size|max_size)[^;]*;)/# \1/' "$f" 2>/dev/null || true
 done
-`
 
-func (m *RealManager) ensureConfOnlyHashTuning(ctx context.Context) error {
-	return m.host.RunShell(ctx, commentNginxConfHashScript)
+sed -i "/${BEGIN}/,/${END}/d" "$NGINX" 2>/dev/null || true
+sed -i -E '/^[[:space:]]*#/! s/^[[:space:]]*(server_names_hash_(bucket_size|max_size)[^;]*;)/# \1/' "$NGINX" 2>/dev/null || true
+
+sed -i "/^[[:space:]]*http[[:space:]]*{/a\\
+    ${BEGIN}\\
+    server_names_hash_bucket_size ${BUCKET};\\
+    server_names_hash_max_size ${MAX};\\
+    ${END}" "$NGINX"
+`, nginxConfHostPath, hashBeginMarker, hashEndMarker, bucketSize, maxSize, legacyConfDHashPath)
 }
 
 func (m *RealManager) ensureGlobalTuning(ctx context.Context, domains []string) error {
 	bucket, maxSize := serverNamesHashSettings(domains)
-	confPath := m.globalTuningConfHostPath()
-
-	if err := m.ensureConfOnlyHashTuning(ctx); err != nil {
-		return fmt.Errorf("comment nginx.conf hash tuning: %w", err)
-	}
-
-	if err := m.host.MkdirAll(m.host.ChrootPath("/etc/nginx/conf.d"), 0o755); err != nil {
-		return fmt.Errorf("mkdir nginx conf.d: %w", err)
-	}
-	content := globalTuningConfig(bucket, maxSize)
-	if err := m.host.WriteFile(confPath, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("write nginx global tuning: %w", err)
+	if err := m.host.RunShell(ctx, applyNginxHashTuningScript(bucket, maxSize)); err != nil {
+		return fmt.Errorf("apply nginx hash tuning: %w", err)
 	}
 	m.logger.InfoContext(ctx, "nginx global tuning written",
-		"path", globalTuningHostPath,
+		"path", nginxConfHostPath,
 		"server_names_hash_bucket_size", bucket,
 		"server_names_hash_max_size", maxSize,
 	)
 	return nil
 }
 
-// pruneDuplicateHashTuning comments nginx.conf hash lines when conf.d snippet is present.
 func (m *RealManager) pruneDuplicateHashTuning(ctx context.Context) {
-	confPath := m.globalTuningConfHostPath()
-	if _, err := os.Stat(confPath); err != nil {
-		return
-	}
-	if err := m.ensureConfOnlyHashTuning(ctx); err != nil {
-		m.logger.WarnContext(ctx, "could not comment nginx.conf hash tuning", "error", err)
+	script := fmt.Sprintf(`rm -f %q /etc/nginx/conf.d/00-vpsdeploy-global.conf
+sed -i -E '/^[[:space:]]*#/! s/^[[:space:]]*(server_names_hash_(bucket_size|max_size)[^;]*;)/# \1/' %q 2>/dev/null || true
+for f in /etc/nginx/conf.d/*.conf; do
+  [ -f "$f" ] || continue
+  sed -i -E '/^[[:space:]]*#/! s/^[[:space:]]*(server_names_hash_(bucket_size|max_size)[^;]*;)/# \1/' "$f" 2>/dev/null || true
+done
+`, legacyConfDHashPath, nginxConfHostPath)
+	if err := m.host.RunShell(ctx, script); err != nil {
+		m.logger.WarnContext(ctx, "could not prune duplicate nginx hash tuning", "error", err)
 	}
 }

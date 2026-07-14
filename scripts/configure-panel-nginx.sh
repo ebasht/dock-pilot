@@ -63,12 +63,15 @@ if [[ -n "$DOMAIN" ]]; then
 fi
 
 tmp="$(mktemp)"
-if curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install-lib.sh" -o "$tmp" 2>/dev/null; then
+if [[ -f "${ROOT}/scripts/install-lib.sh" ]]; then
+  # shellcheck source=scripts/install-lib.sh
+  source "${ROOT}/scripts/install-lib.sh"
+elif curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install-lib.sh" -o "$tmp" 2>/dev/null; then
   # shellcheck source=/dev/null
   source "$tmp"
 else
-  # shellcheck source=scripts/install-lib.sh
-  source "${ROOT}/scripts/install-lib.sh"
+  echo "install-lib.sh not found in ${ROOT}/scripts" >&2
+  exit 1
 fi
 rm -f "$tmp"
 
