@@ -162,10 +162,25 @@ func (m *RealManager) certificateExists(primaryDomain string) bool {
 func (m *RealManager) TestConfig(ctx context.Context) error {
 	m.pruneDuplicateHashTuning(ctx)
 	m.logger.InfoContext(ctx, "nginx config test")
-	if err := m.host.Run(ctx, "nginx", "-t"); err != nil {
-		return fmt.Errorf("nginx -t: %w", err)
+	out, err := m.host.RunCombined(ctx, "nginx", "-t")
+	if err == nil {
+		return nil
 	}
-	return nil
+
+	combined := out + err.Error()
+	if strings.Contains(combined, "server_names_hash_bucket_size") {
+		m.logger.WarnContext(ctx, "nginx -t failed due to server_names_hash; re-applying hash tuning", "error", err)
+		// Use a conservative large bucket so long domains pass without knowing all vhosts.
+		if tuneErr := m.host.RunShell(ctx, applyNginxHashTuningScript(128, 2048)); tuneErr != nil {
+			return fmt.Errorf("nginx -t: %w (hash retune failed: %v)", err, tuneErr)
+		}
+		if _, retryErr := m.host.RunCombined(ctx, "nginx", "-t"); retryErr == nil {
+			return nil
+		} else {
+			return fmt.Errorf("nginx -t: %w", retryErr)
+		}
+	}
+	return fmt.Errorf("nginx -t: %w", err)
 }
 
 func (m *RealManager) Reload(ctx context.Context) error {
