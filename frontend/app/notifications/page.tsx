@@ -1,16 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { browserTimezone } from "@/lib/timezone";
+import { browserTimezone, listTimezones, resolveDigestTimezone } from "@/lib/timezone";
 import { useI18n } from "@/lib/i18n/context";
 import type { NotificationSettings, UpdateNotificationSettings } from "@/lib/types";
-
-function resolveDigestTimezone(stored?: string): string {
-  const tz = stored?.trim();
-  if (!tz || tz === "UTC") return browserTimezone();
-  return tz;
-}
 
 export default function NotificationsPage() {
   const { t } = useI18n();
@@ -31,6 +25,12 @@ export default function NotificationsPage() {
   const [dailyDigestHour, setDailyDigestHour] = useState(9);
   const [dailyDigestTimezone, setDailyDigestTimezone] = useState(() => browserTimezone());
   const [alertOnIncident, setAlertOnIncident] = useState(true);
+
+  const browserTz = useMemo(() => browserTimezone(), []);
+  const timezoneOptions = useMemo(
+    () => listTimezones(dailyDigestTimezone, settings?.daily_digest_timezone ?? ""),
+    [dailyDigestTimezone, settings?.daily_digest_timezone],
+  );
 
   const load = useCallback(async () => {
     try {
@@ -80,6 +80,7 @@ export default function NotificationsPage() {
       const updated = await api.updateNotificationSettings(buildPayload());
       setSettings(updated);
       setTokenSet(updated.telegram_bot_token_set);
+      setDailyDigestTimezone(resolveDigestTimezone(updated.daily_digest_timezone));
       setTelegramBotToken("");
       setClearToken(false);
       setSaved(true);
@@ -110,6 +111,7 @@ export default function NotificationsPage() {
         const updated = await api.updateNotificationSettings(buildPayload());
         setSettings(updated);
         setTokenSet(updated.telegram_bot_token_set);
+        setDailyDigestTimezone(resolveDigestTimezone(updated.daily_digest_timezone));
       }
       await api.sendNotificationTest();
       setTestOk(true);
@@ -240,8 +242,41 @@ export default function NotificationsPage() {
             ))}
           </select>
           <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
-            {t("notifications.digestHourHint", { tz: dailyDigestTimezone })}
+            {t("notifications.digestHourHint")}
           </p>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="digest-timezone">
+            {t("notifications.digestTimezone")}
+          </label>
+          <select
+            id="digest-timezone"
+            className="input"
+            value={dailyDigestTimezone}
+            onChange={(e) => setDailyDigestTimezone(e.target.value)}
+            disabled={!dailyDigestEnabled}
+          >
+            {timezoneOptions.map((tz) => (
+              <option key={tz} value={tz}>
+                {tz}
+              </option>
+            ))}
+          </select>
+          <p style={{ color: "var(--muted)", fontSize: "0.8125rem", margin: "0.35rem 0 0" }}>
+            {t("notifications.digestTimezoneHint")}
+          </p>
+          {browserTz !== dailyDigestTimezone && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ marginTop: "0.5rem" }}
+              disabled={!dailyDigestEnabled}
+              onClick={() => setDailyDigestTimezone(browserTz)}
+            >
+              {t("notifications.useBrowserTimezone", { tz: browserTz })}
+            </button>
+          )}
         </div>
 
         <div className="field">
