@@ -38,6 +38,8 @@ type Client interface {
 	AllocatePort(ctx context.Context) (int, error)
 	InspectContainer(ctx context.Context, names ...string) (ContainerStatus, error)
 	StreamContainerLogs(ctx context.Context, tail int, follow bool, names []string, fn func(ContainerLogLine) error) error
+	Prune(ctx context.Context) (PruneResult, error)
+	DiskUsage(ctx context.Context) (DiskUsageSnapshot, error)
 }
 
 // StubClient logs actions without touching Docker.

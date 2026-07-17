@@ -12,6 +12,7 @@ import (
 	notifpkg "github.com/ebash/dock-pilot/backend/internal/notifications"
 	secretpkg "github.com/ebash/dock-pilot/backend/internal/secrets"
 	sitesvc "github.com/ebash/dock-pilot/backend/internal/sites"
+	syspkg "github.com/ebash/dock-pilot/backend/internal/system"
 )
 
 type Handlers struct {
@@ -20,6 +21,7 @@ type Handlers struct {
 	Deployments   *DeploymentsHandler
 	Notifications *NotificationsHandler
 	QR            *QRHandler
+	System        *SystemHandler
 }
 
 func NewRouter(h Handlers, apiToken string, corsOrigins []string) http.Handler {
@@ -83,6 +85,11 @@ func NewRouter(h Handlers, apiToken string, corsOrigins []string) http.Handler {
 				r.Post("/test", h.Notifications.SendTest)
 			})
 
+			r.Route("/system", func(r chi.Router) {
+				r.Get("/status", h.System.Status)
+				r.Post("/docker/prune", h.System.PruneDocker)
+			})
+
 			r.Get("/deployments/{id}/logs/stream", h.Deployments.StreamLogs)
 		})
 	})
@@ -90,7 +97,7 @@ func NewRouter(h Handlers, apiToken string, corsOrigins []string) http.Handler {
 	return r
 }
 
-func Mount(logger *slog.Logger, apiToken string, corsOrigins []string, sites *sitesvc.Service, secrets *secretpkg.Service, deployments *deploysvc.Service, notifications *notifpkg.Service, qr *QRHandler) http.Handler {
+func Mount(logger *slog.Logger, apiToken string, corsOrigins []string, sites *sitesvc.Service, secrets *secretpkg.Service, deployments *deploysvc.Service, notifications *notifpkg.Service, systemSvc *syspkg.Service, qr *QRHandler) http.Handler {
 	_ = logger
 	return NewRouter(Handlers{
 		Sites:         NewSitesHandler(sites),
@@ -98,5 +105,6 @@ func Mount(logger *slog.Logger, apiToken string, corsOrigins []string, sites *si
 		Deployments:   NewDeploymentsHandler(deployments),
 		Notifications: NewNotificationsHandler(notifications),
 		QR:            qr,
+		System:        NewSystemHandler(systemSvc),
 	}, apiToken, corsOrigins)
 }

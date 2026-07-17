@@ -13,6 +13,8 @@ import type {
   Site,
   SiteHealth,
   SiteListItem,
+  SystemStatus,
+  DockerPruneResult,
   UpdateNotificationSettings,
 } from "./types";
 
@@ -205,6 +207,11 @@ export const api = {
 
   createQRSession: () =>
     request<{ code: string; expires_at: string }>("/api/auth/qr", { method: "POST" }),
+
+  getSystemStatus: () => request<SystemStatus>("/api/system/status"),
+
+  pruneDocker: () =>
+    request<DockerPruneResult>("/api/system/docker/prune", { method: "POST" }),
 };
 
 export async function exchangeQRCode(code: string): Promise<string> {

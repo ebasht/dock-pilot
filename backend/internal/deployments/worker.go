@@ -106,6 +106,16 @@ func (w *Worker) process(job deployJob) {
 		Status: "active",
 	})
 
+	w.appendLog(ctx, depID, "info", "Cleaning unused Docker images and build cache")
+	if prune, err := w.docker.Prune(ctx); err != nil {
+		w.appendLog(ctx, depID, "warn", "Docker prune skipped: "+err.Error())
+	} else if prune.SpaceReclaimed > 0 || prune.ImagesDeleted > 0 || prune.ContainersDeleted > 0 {
+		w.appendLog(ctx, depID, "info", fmt.Sprintf(
+			"Docker prune: removed %d image(s), %d container(s), reclaimed %s",
+			prune.ImagesDeleted, prune.ContainersDeleted, formatBytes(prune.SpaceReclaimed),
+		))
+	}
+
 	w.finish(ctx, depID, "succeeded", "Deployment completed successfully")
 }
 
@@ -486,6 +496,19 @@ func mergeCertDomains(primary string, domains []string) []string {
 		}
 	}
 	return out
+}
+
+func formatBytes(n uint64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := uint64(unit), 0
+	for v := n / unit; v >= unit; v /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
 }
 
 func extractHost(url string) string {

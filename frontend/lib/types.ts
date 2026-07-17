@@ -51,6 +51,53 @@ export interface SiteHealth {
   checked_at: string;
 }
 
+export interface SystemDisk {
+  path: string;
+  total_bytes: number;
+  used_bytes: number;
+  available_bytes: number;
+  used_percent: number;
+}
+
+export interface SystemMemory {
+  total_bytes: number;
+  available_bytes: number;
+  used_bytes: number;
+  used_percent: number;
+}
+
+export interface SystemProcess {
+  pid: number;
+  user: string;
+  cpu_percent: number;
+  mem_percent: number;
+  rss_bytes: number;
+  command: string;
+}
+
+export interface SystemDockerUsage {
+  images_bytes: number;
+  containers_bytes: number;
+  volumes_bytes: number;
+  build_cache_bytes: number;
+  reclaimable_bytes: number;
+}
+
+export interface SystemStatus {
+  disk: SystemDisk[];
+  memory: SystemMemory;
+  top_cpu: SystemProcess[];
+  top_mem: SystemProcess[];
+  docker: SystemDockerUsage;
+  checked_at: string;
+}
+
+export interface DockerPruneResult {
+  containers_deleted: number;
+  images_deleted: number;
+  space_reclaimed: number;
+}
+
 export interface NotificationSettings {
   enabled: boolean;
   telegram_chat_id: string;

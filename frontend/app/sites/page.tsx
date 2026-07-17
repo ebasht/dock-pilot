@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { HealthBadge } from "@/components/HealthBadge";
+import { ServerStatusPanel } from "@/components/ServerStatusPanel";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, ApiError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
@@ -44,6 +45,8 @@ export default function SitesPage() {
 
   return (
     <div>
+      <ServerStatusPanel />
+
       <div className="page-header">
         <h1>{t("sites.title")}</h1>
         <Link href="/sites/new" className="btn">

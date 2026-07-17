@@ -21,6 +21,7 @@ import (
 	"github.com/ebash/dock-pilot/backend/internal/sites"
 	"github.com/ebash/dock-pilot/backend/internal/ssl"
 	"github.com/ebash/dock-pilot/backend/internal/storage"
+	"github.com/ebash/dock-pilot/backend/internal/system"
 )
 
 func main() {
@@ -78,6 +79,7 @@ func main() {
 	worker := deployments.NewWorker(queries, dockerClient, nginxMgr, sslMgr, secretsSvc, cfg.Deploy.WorkDir, logger)
 	deploySvc := deployments.NewService(queries, worker)
 	notifWorker := notifications.NewWorker(notifSvc, logger)
+	systemSvc := system.NewService(cfg.Deploy.HostRoot, dockerClient)
 
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
@@ -85,7 +87,7 @@ func main() {
 
 	logger.Info("cors allowed origins", "origins", cfg.CORSAllowedOrigins)
 	qrSvc := auth.NewQRService(pool, cfg.APIToken)
-	handler := api.Mount(logger, cfg.APIToken, cfg.CORSAllowedOrigins, sitesSvc, secretsSvc, deploySvc, notifSvc, api.NewQRHandler(qrSvc))
+	handler := api.Mount(logger, cfg.APIToken, cfg.CORSAllowedOrigins, sitesSvc, secretsSvc, deploySvc, notifSvc, systemSvc, api.NewQRHandler(qrSvc))
 	server := &http.Server{
 		Addr:         cfg.HTTPAddr,
 		Handler:      handler,
