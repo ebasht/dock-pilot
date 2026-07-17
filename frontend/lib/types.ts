@@ -75,12 +75,29 @@ export interface SystemProcess {
   command: string;
 }
 
+export interface SystemDockerImage {
+  id: string;
+  tags: string[];
+  size_bytes: number;
+  total_bytes: number;
+  in_use: boolean;
+  dangling: boolean;
+}
+
 export interface SystemDockerUsage {
   images_bytes: number;
   containers_bytes: number;
   volumes_bytes: number;
   build_cache_bytes: number;
   reclaimable_bytes: number;
+  image_count?: number;
+  unused_image_count?: number;
+  top_images?: SystemDockerImage[];
+}
+
+export interface SystemDockerDir {
+  path: string;
+  size_bytes: number;
 }
 
 export interface SystemStatus {
@@ -89,6 +106,7 @@ export interface SystemStatus {
   top_cpu: SystemProcess[];
   top_mem: SystemProcess[];
   docker: SystemDockerUsage;
+  docker_dirs?: SystemDockerDir[];
   checked_at: string;
 }
 

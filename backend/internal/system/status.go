@@ -46,7 +46,14 @@ type Status struct {
 	TopCPU    []ProcessInfo            `json:"top_cpu"`
 	TopMem    []ProcessInfo            `json:"top_mem"`
 	Docker    docker.DiskUsageSnapshot `json:"docker"`
+	DockerDirs []DirUsage              `json:"docker_dirs"`
 	CheckedAt time.Time                `json:"checked_at"`
+}
+
+// DirUsage is a host directory size under Docker's data root.
+type DirUsage struct {
+	Path      string `json:"path"`
+	SizeBytes uint64 `json:"size_bytes"`
 }
 
 type Service struct {
@@ -94,11 +101,58 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		out.Docker = du
 	}
 
+	out.DockerDirs = s.dockerDataDirs(ctx)
+
 	return out, nil
 }
 
 func (s *Service) PruneDocker(ctx context.Context) (docker.PruneResult, error) {
 	return s.docker.Prune(ctx)
+}
+
+// dockerDataDirs reports on-disk sizes of /var/lib/docker subdirectories (host view).
+func (s *Service) dockerDataDirs(ctx context.Context) []DirUsage {
+	names := []string{"overlay2", "image", "volumes", "containers", "buildkit", "tmp"}
+	args := make([]string, 0, len(names)+1)
+	args = append(args, "-sb")
+	for _, name := range names {
+		p := "/var/lib/docker/" + name
+		if s.host.UsesChroot() {
+			// du runs via chroot → host paths.
+			p = "/var/lib/docker/" + name
+		}
+		args = append(args, p)
+	}
+
+	duCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	var outRaw string
+	var err error
+	if s.host.UsesChroot() {
+		outRaw, err = s.host.RunShellCombined(duCtx, "du -sb /var/lib/docker/overlay2 /var/lib/docker/image /var/lib/docker/volumes /var/lib/docker/containers /var/lib/docker/buildkit /var/lib/docker/tmp 2>/dev/null || true")
+	} else {
+		outRaw, err = s.host.RunHostCombined(duCtx, "du", args...)
+	}
+	if err != nil && outRaw == "" {
+		return nil
+	}
+
+	var rows []DirUsage
+	sc := bufio.NewScanner(strings.NewReader(outRaw))
+	for sc.Scan() {
+		fields := strings.Fields(sc.Text())
+		if len(fields) < 2 {
+			continue
+		}
+		sz, err := strconv.ParseUint(fields[0], 10, 64)
+		if err != nil || sz == 0 {
+			continue
+		}
+		rows = append(rows, DirUsage{Path: fields[1], SizeBytes: sz})
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].SizeBytes > rows[j].SizeBytes })
+	return rows
 }
 
 func diskUsage(statPath, label string) (DiskInfo, error) {

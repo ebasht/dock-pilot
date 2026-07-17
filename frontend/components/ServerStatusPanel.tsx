@@ -41,6 +41,7 @@ export function ServerStatusPanel() {
   const handlePrune = async () => {
     setPruning(true);
     setPruneMsg(null);
+    setError(null);
     try {
       const r = await api.pruneDocker();
       setPruneMsg(
@@ -82,6 +83,14 @@ export function ServerStatusPanel() {
 
   const root = status.disk[0];
   const mem = status.memory;
+  const docker = status.docker;
+  const topImages = docker?.top_images ?? [];
+  const dockerDirs = status.docker_dirs ?? [];
+  const dockerTotal =
+    (docker?.images_bytes ?? 0) +
+    (docker?.build_cache_bytes ?? 0) +
+    (docker?.volumes_bytes ?? 0) +
+    (docker?.containers_bytes ?? 0);
 
   return (
     <div className="card server-status" style={{ marginBottom: "1.25rem" }}>
@@ -101,7 +110,7 @@ export function ServerStatusPanel() {
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <button type="button" className="btn btn-secondary" onClick={load} disabled={loading}>
+          <button type="button" className="btn btn-secondary" onClick={load} disabled={loading || pruning}>
             {t("common.refresh")}
           </button>
           <button
@@ -167,22 +176,96 @@ export function ServerStatusPanel() {
 
         <div>
           <div className="server-status-label">{t("system.docker")}</div>
-          <div className="server-status-value">
-            {formatBytes(
-              (status.docker?.images_bytes ?? 0) +
-                (status.docker?.build_cache_bytes ?? 0) +
-                (status.docker?.volumes_bytes ?? 0),
-            )}
-          </div>
+          <div className="server-status-value">{formatBytes(dockerTotal)}</div>
           <div className="server-status-meta">
-            {t("system.images")}: {formatBytes(status.docker?.images_bytes)} ·{" "}
-            {t("system.buildCache")}: {formatBytes(status.docker?.build_cache_bytes)}
-            {(status.docker?.reclaimable_bytes ?? 0) > 0
-              ? ` · ${t("system.reclaimable")}: ${formatBytes(status.docker.reclaimable_bytes)}`
+            {t("system.images")}: {formatBytes(docker?.images_bytes)} (
+            {docker?.image_count ?? 0}
+            {(docker?.unused_image_count ?? 0) > 0
+              ? `, ${t("system.unusedImages", { n: String(docker.unused_image_count) })}`
               : ""}
+            )
+            <br />
+            {t("system.volumes")}: {formatBytes(docker?.volumes_bytes)} ·{" "}
+            {t("system.buildCache")}: {formatBytes(docker?.build_cache_bytes)}
+            {(docker?.reclaimable_bytes ?? 0) > 0 ? (
+              <>
+                <br />
+                {t("system.reclaimable")}: {formatBytes(docker.reclaimable_bytes)}
+              </>
+            ) : null}
           </div>
         </div>
       </div>
+
+      {(topImages.length > 0 || dockerDirs.length > 0) && (
+        <div className="server-status-procs" style={{ marginTop: "1.25rem" }}>
+          {topImages.length > 0 && (
+            <div>
+              <h3 className="server-status-label">{t("system.topImages")}</h3>
+              <p style={{ color: "var(--muted)", fontSize: "0.75rem", margin: "0 0 0.5rem" }}>
+                {t("system.topImagesHint")}
+              </p>
+              <div className="table-wrap">
+                <table className="table table-compact">
+                  <thead>
+                    <tr>
+                      <th>{t("system.image")}</th>
+                      <th>{t("system.size")}</th>
+                      <th>{t("system.status")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topImages.map((img) => (
+                      <tr key={img.id}>
+                        <td className="cmd-cell" title={img.tags.join(", ")}>
+                          {img.tags[0] || img.id}
+                        </td>
+                        <td>{formatBytes(img.size_bytes)}</td>
+                        <td>
+                          {img.in_use
+                            ? t("system.inUse")
+                            : img.dangling
+                              ? t("system.dangling")
+                              : t("system.unused")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {dockerDirs.length > 0 && (
+            <div>
+              <h3 className="server-status-label">{t("system.dockerDirs")}</h3>
+              <p style={{ color: "var(--muted)", fontSize: "0.75rem", margin: "0 0 0.5rem" }}>
+                {t("system.dockerDirsHint")}
+              </p>
+              <div className="table-wrap">
+                <table className="table table-compact">
+                  <thead>
+                    <tr>
+                      <th>{t("system.path")}</th>
+                      <th>{t("system.size")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dockerDirs.map((d) => (
+                      <tr key={d.path}>
+                        <td className="cmd-cell" title={d.path}>
+                          {d.path.replace("/var/lib/docker/", "")}
+                        </td>
+                        <td>{formatBytes(d.size_bytes)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="server-status-procs">
         <div>
